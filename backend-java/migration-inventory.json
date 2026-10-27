@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/",
+      "handler": "read_root"
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/agent-discovery.json",
+      "handler": "agent_discovery"
+    },
+    {
+      "method": "GET",
+      "path": "/report/{research_id}",
+      "handler": "read_report"
+    },
+    {
+      "method": "GET",
+      "path": "/health/ready",
+      "handler": "health_ready"
+    },
+    {
+      "method": "GET",
+      "path": "/api/artifacts/{artifact_id}",
+      "handler": "get_artifact"
+    },
+    {
+      "method": "GET",
+      "path": "/outputs/{legacy_path:path}",
+      "handler": "get_legacy_artifact"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports",
+      "handler": "get_all_reports"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/{research_id}",
+      "handler": "get_report_by_id"
+    },
+    {
+      "method": "POST",
+      "path": "/api/reports",
+      "handler": "create_or_update_report"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/reports/{research_id}",
+      "handler": "update_report"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reports",
+      "handler": "clear_reports"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reports/{research_id}",
+      "handler": "delete_report"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/{research_id}/chat",
+      "handler": "get_report_chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/reports/{research_id}/chat",
+      "handler": "add_report_chat_message"
+    },
+    {
+      "method": "GET",
+      "path": "/api/research-runs/{run_id}",
+      "handler": "get_research_run"
+    },
+    {
+      "method": "GET",
+      "path": "/api/research-runs/{run_id}/events",
+      "handler": "get_research_events"
+    },
+    {
+      "method": "GET",
+      "path": "/api/research-runs/{run_id}/log",
+      "handler": "download_research_log"
+    },
+    {
+      "method": "POST",
+      "path": "/report/",
+      "handler": "generate_report"
+    },
+    {
+      "method": "GET",
+      "path": "/files/",
+      "handler": "list_files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents",
+      "handler": "list_documents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/{document_id}/content",
+      "handler": "document_content"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/{identifier}/evidence",
+      "handler": "evidence_list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/research-runs/{identifier}/evidence",
+      "handler": "evidence_list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/research-runs/{identifier}/evidence/{number}",
+      "handler": "evidence_item"
+    },
+    {
+      "method": "GET",
+      "path": "/api/research-runs/{identifier}/evidence/{number}/view",
+      "handler": "evidence_view"
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents",
+      "handler": "upload_document"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/documents/{document_id}",
+      "handler": "delete_document"
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/{document_id}/reindex",
+      "handler": "reindex_document"
+    },
+    {
+      "method": "POST",
+      "path": "/api/multi_agents",
+      "handler": "run_multi_agents"
+    },
+    {
+      "method": "POST",
+      "path": "/upload/",
+      "handler": "upload_file"
+    },
+    {
+      "method": "DELETE",
+      "path": "/files/{filename}",
+      "handler": "delete_file"
+    },
+    {
+      "method": "WEBSOCKET",
+      "path": "/ws",
+      "handler": "websocket_endpoint"
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat",
+      "handler": "chat"
+    }
+  ],
+  "chat_providers": [
+    "aimlapi",
+    "anthropic",
+    "atlascloud",
+    "avian",
+    "azure_openai",
+    "bedrock",
+    "cohere",
+    "dashscope",
+    "deepseek",
+    "fireworks",
+    "forge",
+    "gigachat",
+    "google_genai",
+    "google_vertexai",
+    "groq",
+    "huggingface",
+    "litellm",
+    "minimax",
+    "mistralai",
+    "nebius",
+    "netmind",
+    "ollama",
+    "openai",
+    "openrouter",
+    "together",
+    "vllm_openai",
+    "xai"
+  ],
+  "embedding_providers": [
+    "aimlapi",
+    "azure_openai",
+    "bedrock",
+    "cohere",
+    "custom",
+    "dashscope",
+    "fireworks",
+    "gigachat",
+    "google_genai",
+    "google_vertexai",
+    "huggingface",
+    "minimax",
+    "mistralai",
+    "nebius",
+    "netmind",
+    "nomic",
+    "ollama",
+    "openai",
+    "openrouter",
+    "together",
+    "voyageai"
+  ],
+  "retrievers": [
+    "arxiv",
+    "bing",
+    "bocha",
+    "brave",
+    "crw",
+    "custom",
+    "duckduckgo",
+    "exa",
+    "getxapi",
+    "google",
+    "groundroute",
+    "mcp",
+    "openalex",
+    "pubmed_central",
+    "searchapi",
+    "searx",
+    "semantic_scholar",
+    "serpapi",
+    "serper",
+    "tavily",
+    "xquik"
+  ],
+  "scrapers": [
+    "arxiv",
+    "beautiful_soup",
+    "browser",
+    "firecrawl",
+    "pymupdf",
+    "tavily_extract",
+    "web_base_loader"
+  ],
+  "document_formats": [
+    "csv",
+    "doc",
+    "docx",
+    "htm",
+    "html",
+    "md",
+    "pdf",
+    "pptx",
+    "txt",
+    "xls",
+    "xlsx"
+  ],
+  "configuration_keys": [
+    "AGENT_ROLE",
+    "BROWSE_CHUNK_MAX_LENGTH",
+    "CURATE_SOURCES",
+    "DOC_PATH",
+    "EMBEDDING",
+    "EMBEDDING_KWARGS",
+    "FAST_LLM",
+    "FAST_TOKEN_LIMIT",
+    "IMAGE_GENERATION_ENABLED",
+    "IMAGE_GENERATION_MAX_IMAGES",
+    "IMAGE_GENERATION_MODEL",
+    "IMAGE_GENERATION_PROVIDER",
+    "IMAGE_GENERATION_STYLE",
+    "LANGUAGE",
+    "LLM_KWARGS",
+    "MAX_ITERATIONS",
+    "MAX_SCRAPER_WORKERS",
+    "MAX_SEARCH_RESULTS_PER_QUERY",
+    "MAX_SUBTOPICS",
+    "MCP_ALLOWED_ROOT_PATHS",
+    "MCP_AUTO_TOOL_SELECTION",
+    "MCP_SERVERS",
+    "MCP_STRATEGY",
+    "MEMORY_BACKEND",
+    "PROMPT_FAMILY",
+    "REASONING_EFFORT",
+    "REPORT_FORMAT",
+    "REPORT_SOURCE",
+    "RETRIEVER",
+    "SCRAPER",
+    "SCRAPER_RATE_LIMIT_DELAY",
+    "SIMILARITY_THRESHOLD",
+    "SMART_LLM",
+    "SMART_TOKEN_LIMIT",
+    "STRATEGIC_LLM",
+    "STRATEGIC_TOKEN_LIMIT",
+    "SUMMARY_TOKEN_LIMIT",
+    "TEMPERATURE",
+    "TOTAL_WORDS",
+    "USER_AGENT",
+    "VERBOSE"
+  ],
+  "cli_arguments": [
+    "--encoding",
+    "--no-docx",
+    "--no-pdf",
+    "--query_domains",
+    "--report_source",
+    "--report_type",
+    "--tone",
+    "query"
+  ],
+  "image_providers": [
+    "google",
+    "modelslab"
+  ],
+  "websocket_commands": [
+    "ping",
+    "start",
+    "chat",
+    "human_feedback"
+  ],
+  "mcp_server": "External upstream repository only; no executable server in mcp-server/.",
+  "completion_rule": "Inventory presence is not implementation or live verification."
+}

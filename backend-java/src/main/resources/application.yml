@@ -1,0 +1,31 @@
+server:
+  port: ${SERVER_PORT:8000}
+  error:
+    include-message: never
+    include-stacktrace: never
+spring:
+  servlet:
+    multipart:
+      max-file-size: ${MAX_BLOB_SIZE_MB:50}MB
+      max-request-size: -1
+  application:
+    name: researchrunner-api
+  datasource:
+    url: ${JAVA_DATABASE_URL:jdbc:postgresql://postgres:5432/gpt_researcher}
+    username: ${POSTGRES_USER:gpt_researcher}
+    password: ${POSTGRES_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      connection-timeout: 5000
+      initialization-fail-timeout: -1
+      read-only: ${JAVA_DB_READ_ONLY:true}
+  sql:
+    init:
+      mode: never
+mybatis:
+  configuration:
+    default-statement-timeout: 15
+researchrunner:
+  writes-enabled: ${JAVA_WRITES_ENABLED:false}
+  expected-migration: 0002_shared_library
+  cors-origins: ${CORS_ALLOW_ORIGINS:http://localhost:3800,http://127.0.0.1:3800}
