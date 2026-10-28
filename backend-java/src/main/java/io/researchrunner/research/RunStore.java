@@ -85,10 +85,19 @@ public class RunStore {
     }
 
     public boolean fail(UUID id, String error) {
+        return terminate(id,"failed",error);
+    }
+
+    public boolean cancel(UUID id) {
+        return terminate(id,"cancelled","研究已取消");
+    }
+
+    private boolean terminate(UUID id,String status,String error) {
         JsonNode row = locked(id);
         if (terminal(row)) return false;
         String message = error == null ? "研究失败" : error.substring(0, Math.min(error.length(), 10000));
-        runs.finish(id, "failed", message, row.path("cost_summary").toString());
+        runs.finish(id, status, message, row.path("cost_summary").toString());
+        // The legacy report constraint has no cancelled value; the run retains the exact terminal cause.
         runs.finishReport(id, UUID.fromString(row.path("report_id").asText()), null, "failed");
         return true;
     }

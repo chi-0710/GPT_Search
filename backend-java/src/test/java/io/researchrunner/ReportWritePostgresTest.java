@@ -26,6 +26,53 @@ class ReportWritePostgresTest {
     @Autowired ReportWriteService writes;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired io.researchrunner.research.RunStore runs;
+    @Autowired io.researchrunner.research.ResearchPublication publication;
+    @org.springframework.boot.test.web.server.LocalServerPort int port;
+
+    @Test void realWebSocketHandlesPingAndRejectsInvalidRequests() throws Exception {
+        var messages=new java.util.concurrent.LinkedBlockingQueue<String>();
+        var listener=new java.net.http.WebSocket.Listener() {
+            private final StringBuilder text=new StringBuilder();
+            @Override public void onOpen(java.net.http.WebSocket socket){socket.request(1);}
+            @Override public java.util.concurrent.CompletionStage<?> onText(java.net.http.WebSocket socket,CharSequence data,boolean last) {
+                text.append(data);if(last){messages.add(text.toString());text.setLength(0);}socket.request(1);return null;
+            }
+        };
+        try(var client=java.net.http.HttpClient.newHttpClient()) {
+            var socket=client.newWebSocketBuilder().buildAsync(java.net.URI.create("ws://localhost:"+port+"/ws"),listener).get(5,java.util.concurrent.TimeUnit.SECONDS);
+            try {
+                socket.sendText("ping",true).join();assertEquals("pong",messages.poll(5,java.util.concurrent.TimeUnit.SECONDS));
+                socket.sendText("start {\"task\":\"\"}",true).join();
+                assertEquals("error",json.readTree(messages.poll(5,java.util.concurrent.TimeUnit.SECONDS)).path("type").asText());
+                socket.sendText("{\"type\":\"human_feedback\",\"content\":\"no\"}",true).join();
+                assertEquals("error",json.readTree(messages.poll(5,java.util.concurrent.TimeUnit.SECONDS)).path("type").asText());
+            } finally {socket.sendClose(java.net.http.WebSocket.NORMAL_CLOSURE,"test complete").join();}
+        }
+    }
+
+    @Test void publicationRollsBackArtifactsEventsAndEvidenceOnCompletionFailure() {
+        var run=runs.create("publication rollback","multi_agents","web","Objective",Map.of());
+        var duplicate=Map.<String,Object>of("number",1,"content","evidence");
+        var result=new io.researchrunner.research.ResearchResult("正文",java.util.List.of(),Map.of(),
+                java.util.List.of(duplicate,duplicate),java.util.List.of());
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->publication.publish(run,result,false,false));
+        for(String table:java.util.List.of("artifacts","research_events","research_evidence")) {
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE run_id=?",Integer.class,run.runId()));
+        }
+        assertEquals("running",read(run.researchId()).path("status").asText());
+        runs.fail(run.runId(),"test cleanup");
+    }
+
+    @Test void cancelledRunCannotCreatePublishedArtifacts() {
+        var run=runs.create("cancel publication","multi_agents","web","Objective",Map.of());
+        assertTrue(runs.cancel(run.runId()));
+        var result=new io.researchrunner.research.ResearchResult("正文",java.util.List.of(),Map.of(),
+                java.util.List.of(Map.of("number",1,"content","evidence")),java.util.List.of());
+        assertThrows(IllegalStateException.class,()->publication.publish(run,result,false,false));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM artifacts WHERE run_id=?",Integer.class,run.runId()));
+        assertEquals("failed",read(run.researchId()).path("status").asText());
+        assertEquals("cancelled",jdbc.queryForObject("SELECT status FROM research_runs WHERE id=?",String.class,run.runId()));
+    }
 
     @Test
     void runCompletionPersistsEvidenceAndPreventsTerminalStateOverwrite() {

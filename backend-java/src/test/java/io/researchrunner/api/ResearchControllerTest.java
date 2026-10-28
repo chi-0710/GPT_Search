@@ -15,11 +15,13 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class ResearchControllerTest {
-    @Test void localResearchExecutesGraphExportsAndCompletesWithFrozenScope() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void localResearchExecutesGraphExportsAndCompletesWithFrozenScope(boolean interactive) throws Exception {
         var json=new ObjectMapper();var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         server.createContext("/v1/chat/completions",exchange->{
             var body=json.readTree(exchange.getRequestBody());String instruction=body.path("messages").get(0).path("content").asText();
-            String output=instruction.contains("规划简体")?"{\"title\":\"研究标题\",\"sections\":[\"章节\"]}":instruction.contains("严格审阅")?"{\"accepted\":true,\"feedback\":\"\"}":"研究正文 [E1]";
+            String output=instruction.contains("规划简体")?"{\"title\":\"研究标题\",\"sections\":[\"章节\"]}":instruction.contains("严格审阅")?"{\"accepted\":true,\"feedback\":\"\"}":instruction.contains("数据可视化")?"None":"研究正文 [E1]";
             var response=json.createObjectNode().put("id","test").put("model","test");
             var choice=response.putArray("choices").addObject().put("index",0).put("finish_reason","stop");
             choice.putObject("message").put("role","assistant").put("content",output);
@@ -37,11 +39,26 @@ class ResearchControllerTest {
         when(exports.save(eq(run.researchId()),eq(run.runId()),anyString(),eq(true),eq(true))).thenReturn(Map.of("pdf","/pdf","docx","/docx","md","/md"));
         var env=new MockEnvironment().withProperty("OPENAI_API_KEY","synthetic").withProperty("OPENAI_BASE_URL","http://127.0.0.1:"+server.getAddress().getPort()+"/v1");
         for(String role:List.of("FAST","SMART","STRATEGIC"))env.withProperty(role+"_LLM","openai:test");
-        var controller=new ResearchController(runs,exports,documents,store,embeddings,history,env,json);
+        var service=new ResearchExecutionService(runs,new ResearchPublication(runs,exports),documents,store,embeddings,history,env,json);
+        var controller=new ResearchController(service);
         try {
-            var result=controller.report(Map.of("task","研究主题","report_source","local","document_scope","selected","document_ids",List.of(id.toString()),"generate_in_background",false));
+            var request=new HashMap<String,Object>(Map.of("task","研究主题","report_source","local","document_scope","selected","document_ids",List.of(id.toString()),"generate_in_background",false));
+            request.put("include_human_feedback",interactive);request.put("follow_guidelines",true);
+            var events=new java.util.concurrent.CopyOnWriteArrayList<Map<String,Object>>();
+            var reference=new java.util.concurrent.atomic.AtomicReference<ResearchConnection>();
+            var connection=service.connection(event->{
+                events.add(event);
+                if(event.get("type").equals("human_feedback")) assertTrue(reference.get().feedback(run.runId(),
+                        ((Number)event.get("round")).intValue(),event.get("request_id").toString(),"no"));
+            });reference.set(connection);
+            var result=interactive?service.report(request,connection,true):controller.report(request);
             assertEquals("/pdf",result.get("pdf_path"));assertTrue(result.get("report").toString().contains("/evidence/1/view"));
             verify(documents,times(2)).retrieve(anyString(),eq(List.of(id)));verify(runs).complete(eq(run.runId()),any());verify(runs,never()).fail(any(),any());
-        } finally {controller.close();server.stop(0);}
+            if(interactive) {
+                assertEquals(1,events.stream().filter(e->e.get("type").equals("human_feedback")).count());
+                assertEquals(1,events.stream().filter(e->e.get("type").equals("report_complete")).count());
+                assertTrue(events.stream().anyMatch(e->"section_draft".equals(e.get("content"))));
+            }
+        } finally {service.close();server.stop(0);}
     }
 }

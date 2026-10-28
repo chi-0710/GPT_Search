@@ -16,6 +16,11 @@ public final class SectionTasks {
 
     public static <T> List<T> gather(List<Callable<T>> sections, int concurrency, Duration cleanupTimeout)
             throws Exception {
+        return gather(sections,concurrency,cleanupTimeout,()->false);
+    }
+
+    public static <T> List<T> gather(List<Callable<T>> sections, int concurrency, Duration cleanupTimeout,
+            java.util.function.BooleanSupplier cancelled) throws Exception {
         if (concurrency < 1 || cleanupTimeout.isNegative() || cleanupTimeout.isZero()) {
             throw new IllegalArgumentException("并行数和清理超时必须为正数");
         }
@@ -33,7 +38,12 @@ public final class SectionTasks {
             }
             List<T> result = new ArrayList<>(Collections.nCopies(sections.size(), null));
             for (int i = 0; i < sections.size(); i++) {
-                var item = completed.take().get();
+                Future<Indexed<T>> next;
+                do {
+                    if(cancelled.getAsBoolean())throw new java.util.concurrent.CancellationException("研究已取消");
+                    next=completed.poll(100,TimeUnit.MILLISECONDS);
+                } while(next==null);
+                var item = next.get();
                 result.set(item.index(), item.value());
             }
             return result;
