@@ -36,3 +36,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local personal files
+/第一个文档.docx
+/~$*.docx
+
+# Local runtime data
+/data/reports.json
+
+# Local analysis artifacts
+/.triage/

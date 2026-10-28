@@ -12,11 +12,16 @@ public final class SourceCollector {
     @FunctionalInterface public interface Scraper {
         SearchGateway.Hit fetch(String url,List<String> domains) throws Exception;
     }
-    public record Selection(String source,List<UUID> documentIds,List<String> domains,List<String> sourceUrls,int limit) {
+    public record Selection(String source,List<UUID> documentIds,List<String> domains,List<String> sourceUrls,int limit,
+            List<Map<String,Object>> remoteDocuments) {
         public Selection {
             if(!Set.of("local","web","hybrid").contains(source) || limit<1 || limit>20) throw new IllegalArgumentException("研究来源参数无效");
             documentIds=List.copyOf(documentIds);domains=List.copyOf(domains);sourceUrls=List.copyOf(sourceUrls);
-            if(source.equals("local") && documentIds.isEmpty()) throw new IllegalArgumentException("没有可检索的文件");
+            remoteDocuments=List.copyOf(remoteDocuments);
+            if(source.equals("local") && documentIds.isEmpty() && remoteDocuments.isEmpty()) throw new IllegalArgumentException("没有可检索的文件");
+        }
+        public Selection(String source,List<UUID> documentIds,List<String> domains,List<String> sourceUrls,int limit) {
+            this(source,documentIds,domains,sourceUrls,limit,List.of());
         }
     }
     public record Collected(String context,List<Integer> local,List<Integer> web) { }
@@ -33,6 +38,16 @@ public final class SourceCollector {
     public SourceCollector(Selection selection,LocalRetriever local,SearchGateway search,Scraper scraper,EvidenceRegistry evidence,McpCollector mcp) {
         this.selection=selection;this.local=local;this.search=search;this.scraper=scraper;this.evidence=evidence;
         this.mcp=mcp;
+    }
+
+    /** Frozen source selection of this run (read-only). */
+    public Selection selection() {
+        return selection;
+    }
+
+    /** Frozen source kind of this run: {@code web}, {@code local} or {@code hybrid}. */
+    public String source() {
+        return selection.source();
     }
 
     public Collected collect(String query,int localBudget,int webBudget) throws Exception {
@@ -52,6 +67,10 @@ public final class SourceCollector {
             if(localIds.isEmpty()) evidence.warn("文件来源未提供可用证据"+(selection.source().equals("hybrid")?"，尝试使用网络来源":""));
         }
         checkCancelled();
+        List<Integer> remoteIds=evidence.register(selection.remoteDocuments(),"document");
+        if(!remoteIds.isEmpty()) {
+            var combined=new ArrayList<>(localIds);combined.addAll(remoteIds);localIds=List.copyOf(combined);
+        }
         if(!selection.source().equals("local")) {
             List<SearchGateway.Hit> hits=new ArrayList<>();
             try {

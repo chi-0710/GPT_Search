@@ -39,6 +39,8 @@ export interface MCPConfig {
 }
 
 export interface ChatBoxSettings {
+  document_scope?: "all" | "selected";
+  document_ids?: string[];
   report_type: string;
   report_source: string;
   tone: string;
@@ -48,6 +50,7 @@ export interface ChatBoxSettings {
   mcp_enabled: boolean;
   mcp_configs: MCPConfig[];
   mcp_strategy?: string;
+  include_human_feedback?: boolean;
 }
 
 export interface Domain {
@@ -55,6 +58,7 @@ export interface Domain {
 }
 
 export interface ChatMessage {
+  id?: string;
   role: "user" | "assistant" | "system";
   content: string;
   timestamp?: number;
@@ -68,4 +72,5 @@ export interface ResearchHistoryItem {
   timestamp: number;
   orderedData: Data[];
   chatMessages?: ChatMessage[];
-} 
+  status?: 'queued' | 'running' | 'completed' | 'failed';
+}

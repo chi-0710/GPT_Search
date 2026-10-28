@@ -10,7 +10,7 @@ import unittest
 
 from bs4 import BeautifulSoup
 
-from gpt_researcher.scraper.utils import extract_title
+from search.scraper.utils import extract_title
 
 
 def _title(html: str) -> str:

@@ -22,7 +22,7 @@ sys.modules.setdefault("azure", azure_module)
 sys.modules.setdefault("azure.storage", azure_storage_module)
 sys.modules.setdefault("azure.storage.blob", azure_blob_module)
 
-module_path = Path(__file__).resolve().parents[1] / "gpt_researcher" / "document" / "azure_document_loader.py"
+module_path = Path(__file__).resolve().parents[1] / "search" / "document" / "azure_document_loader.py"
 spec = importlib.util.spec_from_file_location("azure_document_loader", module_path)
 azure_document_loader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(azure_document_loader)

@@ -13,7 +13,7 @@ reasonable window to investigate and ship a fix before any public disclosure.
 
 ## Threat model — please read before reporting
 
-GPT-Researcher is **open-source software that you, the operator, run in your own
+ResearchRunner is **open-source software that you, the operator, run in your own
 environment.** Understanding the intended deployment model avoids duplicate
 reports for behavior that is by design.
 
@@ -40,7 +40,7 @@ concerns and out of scope** as project vulnerabilities:
   servers is an intended feature for the trusted operator; do not expose the
   endpoint that accepts MCP configs to untrusted clients.
 
-If you want to run GPT-Researcher in a shared or public setting, add an
+If you want to run ResearchRunner in a shared or public setting, add an
 authentication/authorization layer in front of it. Contributions of an
 **optional** hardening layer (e.g. opt-in API-key auth) are welcome via PR.
 

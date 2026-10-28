@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from gpt_researcher.retrievers.exa.exa import ExaSearch
+from search.retrievers.exa.exa import ExaSearch
 
 
 def _searcher():

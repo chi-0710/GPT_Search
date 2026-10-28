@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 from langchain_core.documents import Document
 
-from gpt_researcher.context.compression import ContextCompressor
-from gpt_researcher.prompts import PromptFamily
+from search.context.compression import ContextCompressor
+from search.prompts import PromptFamily
 
 
 @pytest.mark.asyncio

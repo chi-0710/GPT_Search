@@ -10,6 +10,8 @@ from .plan_review import (
     DEFAULT_MAX_PLAN_REVISIONS,
     route_human_feedback,
 )
+from .fact_review import route_fact_check, DEFAULT_MAX_FACT_CHECK_REVISIONS
+from multi_agents.runtime import ResearchRuntime, active_runtime, gather_sections
 
 # Import agent classes
 from . import \
@@ -25,23 +27,25 @@ from . import \
 class ChiefEditorAgent:
     """Agent responsible for managing and coordinating editing tasks."""
 
-    def __init__(self, task: dict, websocket=None, stream_output=None, tone=None, headers=None):
+    def __init__(self, task: dict, websocket=None, stream_output=None, tone=None, headers=None, output_dir=None, runtime=None):
         self.task = task
         self.websocket = websocket
         self.stream_output = stream_output
         self.headers = headers or {}
         self.tone = tone
+        self.runtime = runtime or ResearchRuntime()
         self.task_id = self._generate_task_id()
-        self.output_dir = self._create_output_directory()
+        self.output_dir = self._create_output_directory(output_dir)
 
     def _generate_task_id(self):
         # Currently time based, but can be any unique identifier
         return int(time.time())
 
-    def _create_output_directory(self):
-        output_dir = "./outputs/" + \
-            sanitize_filename(
-                f"run_{self.task_id}_{self.task.get('query')[0:40]}")
+    def _create_output_directory(self, requested_output_dir=None):
+        output_dir = requested_output_dir or (
+            "./outputs/"
+            + sanitize_filename(f"run_{self.task_id}_{self.task.get('query')[0:40]}")
+        )
 
         os.makedirs(output_dir, exist_ok=True)
         return output_dir
@@ -49,8 +53,8 @@ class ChiefEditorAgent:
     def _initialize_agents(self):
         return {
             "writer": WriterAgent(self.websocket, self.stream_output, self.headers),
-            "editor": EditorAgent(self.websocket, self.stream_output, self.tone, self.headers),
-            "research": ResearchAgent(self.websocket, self.stream_output, self.tone, self.headers),
+            "editor": EditorAgent(self.websocket, self.stream_output, self.tone, self.headers, self.runtime),
+            "research": ResearchAgent(self.websocket, self.stream_output, self.tone, self.headers, self.runtime),
             "publisher": PublisherAgent(self.output_dir, self.websocket, self.stream_output, self.headers),
             "human": HumanAgent(self.websocket, self.stream_output, self.headers),
             "fact_checker": FactCheckerAgent(self.websocket, self.stream_output, self.headers),
@@ -69,6 +73,7 @@ class ChiefEditorAgent:
         workflow.add_node("visualizer", agents["visualizer"].run)
         workflow.add_node("publisher", agents["publisher"].run)
         workflow.add_node("human", agents["human"].review_plan)
+        workflow.add_node("repair_sections", self._repair_sections)
 
         # Add edges
         self._add_workflow_edges(workflow)
@@ -85,23 +90,35 @@ class ChiefEditorAgent:
         workflow.add_edge('publisher', END)
 
         # Add human in the loop
-        MAX_REVISIONS = 5
         workflow.add_conditional_edges(
             'human',
-            lambda state: (
-                "accept" if state['human_feedback'] is None
-                else "force_accept" if state.get('revisions_count', 0) >= MAX_REVISIONS
-                else "revise"
-            ),
-            {"accept": "researcher", "force_accept": "researcher", "revise": "planner"}
+            self._route_human_feedback,
+            {"accept": "researcher", "revise": "planner"}
         )
 
         # Fact-checker loop — bounded via task.max_fact_check_revisions
         workflow.add_conditional_edges(
             'fact_checker',
             self._route_fact_check,
-            {"accept": "visualizer", "revise": "writer"}
+            {"accept": "visualizer", "revise": "repair_sections"}
         )
+        workflow.add_edge("repair_sections", "writer")
+
+    def _route_fact_check(self, state):
+        return route_fact_check(
+            state, self.task.get("max_fact_check_revisions", DEFAULT_MAX_FACT_CHECK_REVISIONS)
+        )
+
+    async def _repair_sections(self, state):
+        """Apply fact-check notes to chapter bodies before rewriting the layout."""
+        from .reviser import ReviserAgent
+        reviser = ReviserAgent(self.websocket, self.stream_output, self.headers)
+        revisions = await gather_sections([
+            reviser.run({"task": state["task"], "draft": draft,
+                         "review": state["fact_check_notes"]})
+            for draft in state.get("research_data", [])
+        ])
+        return {"research_data": [item["draft"] for item in revisions]}
 
     def _route_human_feedback(self, review):
         max_plan_revisions = self.task.get(
@@ -114,7 +131,7 @@ class ChiefEditorAgent:
         return self._create_workflow(agents)
 
     async def _log_research_start(self):
-        message = f"Starting the research process for query '{self.task.get('query')}'..."
+        message = f"正在启动查询“{self.task.get('query')}”的研究流程..."
         if self.websocket and self.stream_output:
             await self.stream_output("logs", "starting_research", message, self.websocket)
         else:
@@ -142,5 +159,9 @@ class ChiefEditorAgent:
             }
         }
 
-        result = await chain.ainvoke({"task": self.task}, config=config)
-        return result
+        config["recursion_limit"] = 100
+        token = active_runtime.set(self.runtime)
+        try:
+            return await chain.ainvoke({"task": self.task}, config=config)
+        finally:
+            active_runtime.reset(token)

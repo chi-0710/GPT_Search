@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from gpt_researcher.retrievers.tavily.tavily_search import TavilySearch
+from search.retrievers.tavily.tavily_search import TavilySearch
 
 
 def test_tavily_skips_sources_missing_url_or_non_dict():

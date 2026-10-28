@@ -1,2 +1,19 @@
 .git
 output/
+.env
+.env.*
+!.env.example
+
+**/node_modules
+**/.next
+**/__pycache__
+**/.venv
+**/venv
+
+# Local caches, operational logs and maintenance artifacts (not runtime inputs).
+.pytest_cache/
+.triage/
+logs/
+outputs/cleanup-backups/
+frontend/nextjs/dist/
+**/*.tsbuildinfo

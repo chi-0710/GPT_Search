@@ -1,21 +1,11 @@
 from dotenv import load_dotenv
 import logging
-from pathlib import Path
-
-# Create logs directory if it doesn't exist
-logs_dir = Path("logs")
-logs_dir.mkdir(exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        # File handler for general application logs
-        logging.FileHandler('logs/app.log'),
-        # Stream handler for console output
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 
 # Suppress verbose fontTools logging

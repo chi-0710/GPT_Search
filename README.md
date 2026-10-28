@@ -1,362 +1,232 @@
-<div align="center" id="top">
+# 知行研究助手（ResearchRunner）
 
-<img src="https://github.com/assafelovic/gpt-researcher/assets/13554167/20af8286-b386-44a5-9a83-3be1365139c3" alt="Logo" width="80">
+知行研究助手 是一个开源的深度研究智能体，可基于网络资料、本地文档或两者结合生成带引用的研究报告。本仓库包含 Python 后端和 Next.js 前端，适合在本地或自己的服务器上部署。
 
-####
+## 主要功能
 
-[![Website](https://img.shields.io/badge/Official%20Website-gptr.dev-teal?style=for-the-badge&logo=world&logoColor=white&color=0891b2)](https://gptr.dev)
-[![Documentation](https://img.shields.io/badge/Documentation-DOCS-f472b6?logo=googledocs&logoColor=white&style=for-the-badge)](https://docs.gptr.dev)
-[![Discord](https://img.shields.io/discord/1127851779011391548?logo=discord&logoColor=white&label=Discord&color=34b76a&style=for-the-badge)](https://discord.gg/QgZXvJAccX)
+- 从网络、本地文档或混合数据源开展研究
+- 统一通过多智能体工作流生成研究报告
+- 展示研究过程、来源、图片和最终报告
+- 支持针对已有报告继续提问
+- 支持 PDF、Word 等报告导出方式
+- 前端界面和默认输出语言已配置为简体中文
 
+### 研究来源的域名限制
 
-[![PyPI version](https://img.shields.io/pypi/v/gpt-researcher?logo=pypi&logoColor=white&style=flat)](https://badge.fury.io/py/gpt-researcher)
-![GitHub Release](https://img.shields.io/github/v/release/assafelovic/gpt-researcher?style=flat&logo=github)
-[![Open In Colab](https://img.shields.io/static/v1?message=Open%20in%20Colab&logo=googlecolab&labelColor=grey&color=yellow&label=%20&style=flat&logoSize=40)](https://colab.research.google.com/github/assafelovic/gpt-researcher/blob/master/docs/docs/examples/pip-run.ipynb)
-[![Docker Image Version](https://img.shields.io/docker/v/elestio/gpt-researcher/latest?arch=amd64&style=flat&logo=docker&logoColor=white&color=1D63ED)](https://hub.docker.com/r/gptresearcher/gpt-researcher)
-[![Skill](https://img.shields.io/badge/Claude%20Skill-skills.sh-blueviolet?style=flat&logo=anthropic&logoColor=white)](https://skills.sh/assafelovic/gpt-researcher/gpt-researcher)
-[![Twitter Follow](https://img.shields.io/twitter/follow/assaf_elovic?style=social)](https://twitter.com/assaf_elovic)
+`ResearchConductor._search_relevant_source_urls()` 会统一校验搜索器返回的 URL，
+仅接收 `query_domains` 指定的域名及其子域名。例如 `example.com` 允许
+`news.example.com`，不允许 `fakeexample.com` 或 `example.com.evil.org`。
+此校验同时覆盖待抓取链接和搜索器直接返回正文的结果；未设置限制时保持原有行为。
+指定范围内没有可用来源时会记录警告，并在启用研究过程输出时展示提示，不自动放宽范围。
+这是搜索结果接收阶段的校验，不负责抓取后的重定向检查，也不替代其他研究入口的过滤。
 
-[English](README.md) | [中文](README-zh_CN.md) | [日本語](README-ja_JP.md) | [한국어](README-ko_KR.md)
+Brave 和 Bing 的请求使用分组的 `site:` 条件，多域名之间使用 `OR`；
+DuckDuckGo 和 SearxNG 按去重后的域名分别发送 `site:` 查询，再交替合并各域名结果、
+按 URL 去重并限制返回总数。因此后两者设置 N 个不同域名时会发出 N 次请求。
+无效的非空域名列表不会退回无范围限制的请求。域名大小写、URL 形式和国际化域名
+使用与结果校验相同的规范化规则。
 
-</div>
+查询语法参考：[Brave API](https://api-dashboard.search.brave.com/documentation/resources/search-operators)、
+[Bing](https://support.microsoft.com/en-us/bing/advanced-search-options)、
+[DuckDuckGo](https://duckduckgo.com/duckduckgo-help-pages/results/syntax)。
+[SearxNG](https://docs.searxng.org/user/search-syntax.html) 将普通查询内容交给底层引擎，
+实际语法支持取决于所选引擎，因此仍保留接收阶段的统一校验。
 
-# 🔎 GPT Researcher
+只验证该函数，无需启动服务或调用外部搜索 API：
 
-**GPT Researcher the first open deep research agent designed for both web and local research on any given task.** 
-
-The agent produces detailed, factual, and unbiased research reports with citations. GPT Researcher provides a full suite of customization options to create tailor made and domain specific research agents. Inspired by the recent [Plan-and-Solve](https://arxiv.org/abs/2305.04091) and [RAG](https://arxiv.org/abs/2005.11401) papers, GPT Researcher addresses misinformation, speed, determinism, and reliability by offering stable performance and increased speed through parallelized agent work.
-
-**Our mission is to empower individuals and organizations with accurate, unbiased, and factual information through AI.**
-
-## Why GPT Researcher?
-
-- Objective conclusions for manual research can take weeks, requiring vast resources and time.
-- LLMs trained on outdated information can hallucinate, becoming irrelevant for current research tasks.
-- Current LLMs have token limitations, insufficient for generating long research reports.
-- Limited web sources in existing services lead to misinformation and shallow results.
-- Selective web sources can introduce bias into research tasks.
-
-## Demo
-<a href="https://www.youtube.com/watch?v=f60rlc_QCxE" target="_blank" rel="noopener">
-  <img src="https://github.com/user-attachments/assets/ac2ec55f-b487-4b3f-ae6f-b8743ad296e4" alt="Demo video" width="800" target="_blank" />
-</a>
-
-## Install as Claude Skill
-
-Extend Claude's deep research capabilities by installing GPT Researcher as a [Claude Skill](https://skills.sh/assafelovic/gpt-researcher/gpt-researcher):
-
-```bash
-npx skills add assafelovic/gpt-researcher
+```powershell
+python -m pytest tests/test_research_domain_filter.py -q
 ```
 
-Once installed, Claude can leverage GPT Researcher's deep research capabilities directly within your conversations.
+同时验证上述四个搜索器的请求构造和域名过滤：
 
-## Architecture
-
-The core idea is to utilize 'planner' and 'execution' agents. The planner generates research questions, while the execution agents gather relevant information. The publisher then aggregates all findings into a comprehensive report.
-
-<div align="center">
-<img align="center" height="600" src="https://github.com/assafelovic/gpt-researcher/assets/13554167/4ac896fd-63ab-4b77-9688-ff62aafcc527">
-</div>
-
-Steps:
-* Create a task-specific agent based on a research query.
-* Generate questions that collectively form an objective opinion on the task.
-* Use a crawler agent for gathering information for each question.
-* Summarize and source-track each resource.
-* Filter and aggregate summaries into a final research report.
-
-## Tutorials
- - [How it Works](https://docs.gptr.dev/blog/building-gpt-researcher)
- - [How to Install](https://www.loom.com/share/04ebffb6ed2a4520a27c3e3addcdde20?sid=da1848e8-b1f1-42d1-93c3-5b0b9c3b24ea)
- - [Live Demo](https://www.loom.com/share/6a3385db4e8747a1913dd85a7834846f?sid=a740fd5b-2aa3-457e-8fb7-86976f59f9b8)
-
-## Features
-
-- 📝 Generate detailed research reports using web and local documents.
-- 🖼️ Smart image scraping and filtering for reports.
-- 🍌 **AI-generated inline images** using Google Gemini (Nano Banana) for visual illustrations.
-- 📜 Generate detailed reports exceeding 2,000 words.
-- 🌐 Aggregate over 20 sources for objective conclusions.
-- 🖥️ Frontend available in lightweight (HTML/CSS/JS) and production-ready (NextJS + Tailwind) versions.
-- 🔍 JavaScript-enabled web scraping.
-- 📂 Maintains memory and context throughout research.
-- 📄 Export reports to PDF, Word, and other formats.
-
-## 📖 Documentation
-
-See the [Documentation](https://docs.gptr.dev/docs/gpt-researcher/getting-started) for:
-- Installation and setup guides
-- Configuration and customization options
-- How-To examples
-- Full API references
-
-## ⚙️ Getting Started
-
-### Installation
-
-1. Install Python 3.11 or later. [Guide](https://www.tutorialsteacher.com/python/install-python).
-2. Clone the project and navigate to the directory:
-
-    ```bash
-    git clone https://github.com/assafelovic/gpt-researcher.git
-    cd gpt-researcher
-    ```
-
-3. Set up API keys by exporting them or storing them in a `.env` file.
-
-    ```bash
-    export OPENAI_API_KEY={Your OpenAI API Key here}
-    export TAVILY_API_KEY={Your Tavily API Key here}
-    ```
-
-    (Optional) For enhanced tracing and observability, you can also set:
-    
-    ```bash
-    # export LANGCHAIN_TRACING_V2=true
-    # export LANGCHAIN_API_KEY={Your LangChain API Key here}
-    ```
-
-    For custom OpenAI-compatible APIs (e.g., local models, other providers), you can also set:
-    
-    ```bash
-    export OPENAI_BASE_URL={Your custom API base URL here}
-    ```
-
-4. Install dependencies and start the FastAPI backend:
-
-    ```bash
-    pip install -r requirements.txt
-    python -m uvicorn main:app --reload
-    ```
-
-5. In a second terminal, install and start the Next.js frontend:
-
-    ```bash
-    cd frontend/nextjs
-    npm install --legacy-peer-deps
-    npm run dev
-    ```
-
-    For direct `npm run dev` usage, put frontend variables such as
-    `NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000` in
-    `frontend/nextjs/.env.local`. Docker Compose reads the same setting from the
-    root `.env` file instead.
-
-Visit [http://localhost:3000](http://localhost:3000) to start researching. The backend at [http://localhost:8000](http://localhost:8000) is an API service; its root returns status JSON and Swagger is available at `/docs`.
-
-For other setups (e.g., Poetry or virtual environments), check the [Getting Started page](https://docs.gptr.dev/docs/gpt-researcher/getting-started).
-
-## Run as PIP package
-```bash
-pip install gpt-researcher
-
-```
-### Example Usage:
-```python
-...
-from gpt_researcher import GPTResearcher
-
-query = "why is Nvidia stock going up?"
-researcher = GPTResearcher(query=query)
-# Conduct research on the given query
-research_result = await researcher.conduct_research()
-# Write the report
-report = await researcher.write_report()
-...
+```powershell
+python -m pytest tests/test_retriever_domain_requests.py tests/test_research_domain_filter.py -q
 ```
 
-**For more examples and configurations, please refer to the [PIP documentation](https://docs.gptr.dev/docs/gpt-researcher/gptr/pip-package) page.**
+## 项目结构
 
-### 🔧 MCP Client
-GPT Researcher supports MCP integration to connect with specialized data sources like GitHub repositories, databases, and custom APIs. This enables research from data sources alongside web search.
-
-```bash
-export RETRIEVER=tavily,mcp  # Enable hybrid web + MCP research
+```text
+search/       核心研究流程、检索器、抓取器和提示词
+backend/              FastAPI 服务及报告、聊天相关功能
+frontend/nextjs/      Next.js 前端
+multi_agents/         多智能体研究实现
+deep_agents/          已归档的历史实验数据与结果
+tests/                后端、核心模块和技能测试
+main.py               后端启动入口
 ```
 
-```python
-from gpt_researcher import GPTResearcher
-import asyncio
-import os
+## 环境要求
 
-async def mcp_research_example():
-    # Enable MCP with web search
-    os.environ["RETRIEVER"] = "tavily,mcp"
-    
-    researcher = GPTResearcher(
-        query="What are the top open source web research agents?",
-        mcp_configs=[
-            {
-                "name": "github",
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-github"],
-                "env": {"GITHUB_TOKEN": os.getenv("GITHUB_TOKEN")}
-            }
-        ]
-    )
-    
-    research_result = await researcher.conduct_research()
-    report = await researcher.write_report()
-    return report
+- Python 3.11 或更高版本
+- Node.js 18 或更高版本
+- npm
+- 可选：Conda、Docker Desktop
+
+## 本地启动
+
+### 1. 创建 Python 环境
+
+推荐使用 Conda 隔离项目依赖：
+
+```powershell
+conda create -n ai-search python=3.11 -y
+conda activate ai-search
 ```
 
-> For comprehensive MCP documentation and advanced examples, visit the [MCP Integration Guide](https://docs.gptr.dev/docs/gpt-researcher/retrievers/mcp-configs).
+### 2. 安装后端依赖
 
-## 🍌 Inline Image Generation
+在项目根目录执行：
 
-GPT Researcher can automatically generate and embed AI-created illustrations in your research reports using Google's Gemini models (Nano Banana).
-
-```bash
-# Enable in your .env file
-IMAGE_GENERATION_ENABLED=true
-GOOGLE_API_KEY=your_google_api_key
-IMAGE_GENERATION_MODEL=models/gemini-2.5-flash-image
+```powershell
+python -m pip install -r requirements.txt
 ```
 
-When enabled, the system will:
-1. Analyze your research context to identify visualization opportunities
-2. Pre-generate 2-3 relevant images during the research phase
-3. Embed them inline as the report is written
+依赖只需在首次创建环境或 `requirements.txt` 更新后重新安装，不需要每次启动都执行。
 
-Images are generated with dark-mode styling that matches the GPT Researcher UI, featuring professional infographic aesthetics with teal accents.
+### 3. 配置环境变量
 
-[Learn more about Image Generation](https://docs.gptr.dev/docs/gpt-researcher/gptr/image_generation) in our documentation.
+复制示例配置：
 
-## ✨ Deep Research
-
-GPT Researcher now includes Deep Research - an advanced recursive research workflow that explores topics with agentic depth and breadth. This feature employs a tree-like exploration pattern, diving deeper into subtopics while maintaining a comprehensive view of the research subject.
-
-- 🌳 Tree-like exploration with configurable depth and breadth
-- ⚡️ Concurrent processing for faster results
-- 🤝 Smart context management across research branches
-- ⏱️ Takes ~5 minutes per deep research
-- 💰 Costs ~$0.4 per research (using `o3-mini` on "high" reasoning effort)
-
-[Learn more about Deep Research](https://docs.gptr.dev/docs/gpt-researcher/gptr/deep_research) in our documentation.
-
-## Run with Docker
-
-> **Step 1** - [Install Docker](https://docs.gptr.dev/docs/gpt-researcher/getting-started/getting-started-with-docker)
-
-> **Step 2** - Clone the '.env.example' file, add your API Keys to the cloned file and save the file as '.env'
-
-> **Step 3** - Within the docker-compose file comment out services that you don't want to run with Docker.
-
-```bash
-docker-compose up --build
+```powershell
+Copy-Item .env.example .env
 ```
 
-If that doesn't work, try running it without the dash:
-```bash
+打开 `.env`，至少配置一个大语言模型密钥和一个搜索服务密钥。例如：
+
+```dotenv
+OPENAI_API_KEY=你的密钥
+TAVILY_API_KEY=你的密钥
+DATABASE_URL=postgresql+asyncpg://gpt_researcher:gpt_researcher@localhost:5432/gpt_researcher
+LANGUAGE=Chinese (Simplified)
+```
+
+请根据实际使用的模型和搜索服务填写对应配置，不要把包含真实密钥的 `.env` 提交到版本库。
+
+服务端业务数据只保存在 PostgreSQL 中，并要求安装 `pgvector` 扩展。本地启动后端前先准备数据库并执行：
+
+```powershell
+python -m alembic upgrade head
+```
+
+数据库不可用、迁移版本落后或缺少 `pgvector` 时，`/health/ready` 返回 503，写接口不会回退到 `reports.json`、`outputs/`、`my-docs/` 或浏览器本地存储。
+
+### 4. 启动后端
+
+在项目根目录执行：
+
+```powershell
+python -m uvicorn main:app --reload
+```
+
+- 后端地址：<http://127.0.0.1:8000>
+- 接口文档：<http://127.0.0.1:8000/docs>
+
+根目录的 `main.py` 会加载 `.env`、初始化日志，并导出 `backend.server.app` 中的 FastAPI 应用。`--reload` 适合本地开发，代码变化后会自动重启服务。
+
+### 5. 配置并启动前端
+
+新开一个终端，进入前端目录：
+
+```powershell
+cd frontend/nextjs
+```
+
+创建 `frontend/nextjs/.env.local`：
+
+```dotenv
+NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000
+```
+
+首次运行或前端依赖变化后安装依赖：
+
+```powershell
+npm install --legacy-peer-deps
+```
+
+启动前端：
+
+```powershell
+npm run dev
+```
+
+浏览器打开 <http://localhost:3000>。以后日常启动只需进入 `frontend/nextjs` 执行 `npm run dev`，不必重复安装依赖。
+
+## Docker 启动
+
+已安装 Docker Desktop 时，可在项目根目录执行：
+
+```powershell
 docker compose up --build
 ```
 
-> **Step 4** - By default, if you haven't uncommented anything in your docker-compose file, this flow will start 2 processes:
- - the Python server running on localhost:8000<br>
- - the React app running on localhost:3000<br>
+首次启动或镜像、依赖发生变化时需要构建；后续可使用 `docker compose up`。
 
-Visit localhost:3000 on any browser and enjoy researching!
+Compose 会启动带 `pgvector` 的 PostgreSQL，并在后端启动前自动执行 Alembic 迁移。历史文件迁移、备份和嵌入模型切换步骤见 [DEPLOYMENT.md](DEPLOYMENT.md)。
 
+## 测试与检查
 
-## 📄 Research on Local Documents
+后端及核心功能测试：
 
-You can instruct the GPT Researcher to run research tasks based on your local documents. Currently supported file formats are: PDF, plain text, CSV, Excel, Markdown, PowerPoint, and Word documents.
-
-Step 1: Add the env variable `DOC_PATH` pointing to the folder where your documents are located.
-
-```bash
-export DOC_PATH="./my-docs"
+```powershell
+python -m pytest tests/
 ```
 
-Step 2: 
- - If you're running the Next.js frontend on localhost:3000, simply select "My Documents" from the "Report Source" Dropdown Options.
- - If you're running GPT Researcher with the [PIP package](https://docs.tavily.com/guides/gpt-researcher/gpt-researcher#pip-package), pass the `report_source` argument as "local" when you instantiate the `GPTResearcher` class [code sample here](https://docs.gptr.dev/docs/gpt-researcher/context/tailored-research).
+真实 PostgreSQL + pgvector 集成测试可通过隔离的测试容器运行：
 
+```powershell
+docker compose --profile test run --rm gpt-researcher-tests
+```
 
-## 🤖 MCP Server
+前端检查：
 
-We've moved our MCP server to a dedicated repository: [gptr-mcp](https://github.com/assafelovic/gptr-mcp).
+```powershell
+cd frontend/nextjs
+npm run lint
+npm run build
+```
 
-The GPT Researcher MCP Server enables AI applications like Claude to conduct deep research. While LLM apps can access web search tools with MCP, GPT Researcher MCP delivers deeper, more reliable research results.
+## 常见问题
 
-Features:
-- Deep research capabilities for AI assistants
-- Higher quality information with optimized context usage
-- Comprehensive results with better reasoning for LLMs
-- Claude Desktop integration
+### 执行 `npm run dev` 时提示找不到 `package.json`
 
-For detailed installation and usage instructions, please visit the [official repository](https://github.com/assafelovic/gptr-mcp).
+说明当前目录不正确。请先进入前端目录：
 
+```powershell
+cd frontend/nextjs
+npm run dev
+```
 
-## 👪 Multi-Agent Assistant
-As AI evolves from prompt engineering and RAG to multi-agent systems, we're excited to introduce multi-agent assistants built with [LangGraph](https://python.langchain.com/v0.1/docs/langgraph/) and [AG2](https://github.com/ag2ai/ag2).
+### 前端打开后无法连接后端
 
-By using multi-agent frameworks, the research process can be significantly improved in depth and quality by leveraging multiple agents with specialized skills. Inspired by the recent [STORM](https://arxiv.org/abs/2402.14207) paper, this project showcases how a team of AI agents can work together to conduct research on a given topic, from planning to publication.
+确认以下三项：
 
-An average run generates a 5-6 page research report in multiple formats such as PDF, Docx and Markdown.
+1. 后端已在 `http://127.0.0.1:8000` 运行。
+2. `frontend/nextjs/.env.local` 中的 `NEXT_PUBLIC_GPTR_API_URL` 指向该地址。
+3. 修改 `.env.local` 后已经重新启动前端。
 
-Check it out [here](https://github.com/assafelovic/gpt-researcher/tree/master/multi_agents) or head over to our documentation for [LangGraph](https://docs.gptr.dev/docs/gpt-researcher/multi_agents/langgraph) and [AG2](https://docs.gptr.dev/docs/gpt-researcher/multi_agents/ag2) for more information.
+### 所有回答仍然是英文
 
-## 🔍 Observability
+确认根目录 `.env` 中包含：
 
-GPT Researcher supports **LangSmith** for enhanced tracing and observability, making it easier to debug and optimize complex multi-agent workflows.
+```dotenv
+LANGUAGE=Chinese (Simplified)
+```
 
-To enable tracing:
-1. Set the following environment variables:
-   ```bash
-   export LANGCHAIN_TRACING_V2=true
-   export LANGCHAIN_API_KEY=your_api_key
-   export LANGCHAIN_PROJECT="gpt-researcher"
-   ```
-2. Run your research tasks as usual. All LangGraph-based agent interactions will be automatically traced and visualized in your LangSmith dashboard.
+修改后重启后端。该配置控制模型生成内容的语言，前端中文界面本身不负责翻译模型回答。
 
-## 🖥️ Frontend Applications
+## 许可证
 
-GPT-Researcher now features an enhanced frontend to improve the user experience and streamline the research process. The frontend offers:
+本项目采用 MIT 许可证，详情见 [LICENSE](LICENSE)。
+# 共享资料库与网络联合研究
 
-- An intuitive interface for inputting research queries
-- Real-time progress tracking of research tasks
-- Interactive display of research findings
-- Customizable settings for tailored research experiences
+支持从共享资料库选择文件，与网络资料联合生成多智能体报告。桌面和移动端均可上传、选择资料，并通过报告引用查看证据快照及 PDF 页码。使用步骤、升级与重新索引、配置和定向测试见 [共享资料库说明](SHARED_LIBRARY.md)。
 
-The Next.js application in `frontend/nextjs` is the only web user interface. FastAPI runs separately as the API and WebSocket service.
+### 唯一报告模式
 
-For detailed setup instructions and more information about the frontend features, please visit our [documentation page](https://docs.gptr.dev/docs/gpt-researcher/frontend/introduction).
-
-## 🚀 Contributing
-We highly welcome contributions! Please check out [contributing](https://github.com/assafelovic/gpt-researcher/blob/master/CONTRIBUTING.md) if you're interested.
-
-Please check out our [roadmap](https://trello.com/b/3O7KBePw/gpt-researcher-roadmap) page and reach out to us via our [Discord community](https://discord.gg/QgZXvJAccX) if you're interested in joining our mission.
-<a href="https://github.com/assafelovic/gpt-researcher/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=assafelovic/gpt-researcher&max=1000" />
-</a>
-## ✉️ Support / Contact us
-- [Community Discord](https://discord.gg/spBgZmm3Xe)
-- Author Email: assaf.elovic@gmail.com
-
-## 🛡 Disclaimer
-
-This project, GPT Researcher, is an experimental application and is provided "as-is" without any warranty, express or implied. We are sharing codes for academic purposes under the Apache 2 license. Nothing herein is academic advice, and NOT a recommendation to use in academic or research papers.
-
-Our view on unbiased research claims:
-1. The main goal of GPT Researcher is to reduce incorrect and biased facts. How? We assume that the more sites we scrape the less chances of incorrect data. By scraping multiple sites per research, and choosing the most frequent information, the chances that they are all wrong is extremely low.
-2. We do not aim to eliminate biases; we aim to reduce it as much as possible. **We are here as a community to figure out the most effective human/llm interactions.**
-3. In research, people also tend towards biases as most have already opinions on the topics they research about. This tool scrapes many opinions and will evenly explain diverse views that a biased person would never have read.
-
----
-
-<p align="center">
-<a href="https://star-history.com/#assafelovic/gpt-researcher">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=assafelovic/gpt-researcher&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=assafelovic/gpt-researcher&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=assafelovic/gpt-researcher&type=Date" />
-  </picture>
-</a>
-</p>
-
-
-<p align="right">
-  <a href="#top">⬆️ Back to Top</a>
-</p>
+知行研究助手（ResearchRunner）统一使用 LangGraph 多智能体流程：初步研究 → 规划与人工审核 → 章节并行研究与审核 → 写作 → 事实核查 → 可视化 → 发布。
+支持仅网络、仅文件、文件＋网络；各阶段共用同一运行的文件范围和证据编号。
+旧的普通、详细、深度模式请求会自动按 `multi_agents` 执行，耗时和费用可能与过去不同。历史报告不改写。
+内部 `research_report`、`subtopic_report` 是研究草稿格式，不是可选报告模式。
+CLI 同样通过 PostgreSQL 资料库与导出服务运行：`python cli.py "研究主题" --report_source hybrid`；需要可访问的数据库配置。
+AG2 和独立深度智能体执行实现已移除，历史实验资料保留。

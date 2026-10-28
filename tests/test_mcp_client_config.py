@@ -9,7 +9,7 @@ server_config["connection_type"] (never set) instead of the transport.
 
 import unittest
 
-from gpt_researcher.mcp.client import MCPClientManager
+from search.mcp.client import MCPClientManager
 
 
 class TestConvertConfigsHeaders(unittest.TestCase):

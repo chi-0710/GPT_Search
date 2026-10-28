@@ -9,10 +9,10 @@ import os
 import pathlib
 from unittest.mock import patch
 
-# Import the module directly to avoid importing the heavy gpt_researcher package.
+# Import the module directly to avoid importing the heavy search package.
 _CRW_PATH = (
     pathlib.Path(__file__).resolve().parent.parent
-    / "gpt_researcher" / "retrievers" / "crw" / "crw.py"
+    / "search" / "retrievers" / "crw" / "crw.py"
 )
 _spec = importlib.util.spec_from_file_location("_crw_under_test", _CRW_PATH)
 _crw = importlib.util.module_from_spec(_spec)

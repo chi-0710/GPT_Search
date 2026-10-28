@@ -7,10 +7,10 @@ from typing import List, Dict, Any
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import InMemoryVectorStore
-from gpt_researcher.memory import Memory
-from gpt_researcher.config.config import Config
-from gpt_researcher.utils.llm import create_chat_completion
-from gpt_researcher.utils.tools import create_chat_completion_with_tools, create_search_tool
+from search.memory import Memory
+from search.config.config import Config
+from search.utils.llm import create_chat_completion
+from search.utils.tools import create_chat_completion_with_tools, create_search_tool
 from tavily import TavilyClient
 from datetime import datetime
 
@@ -26,7 +26,7 @@ logging.basicConfig(
     ]
 )
 
-# Note: LLM client is now handled through GPT Researcher's unified LLM system
+# Note: LLM client is now handled through ResearchRunner's unified LLM system
 # This supports all configured providers (OpenAI, Google Gemini, Anthropic, etc.)
 
 def get_tools():
@@ -36,13 +36,13 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "quick_search",
-                "description": "Search for current events or online information when you need new knowledge that doesn't exist in the current context",
+                "description": "当你需要当前上下文中没有的新知识时，搜索时事或网络信息",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The search query"
+                            "description": "搜索查询"
                         }
                     },
                     "required": ["query"]
@@ -120,10 +120,10 @@ class ChatAgentWithMemory:
                 self.search_metadata = {
                     "query": query,
                     "sources": [],
-                    "error": "Web search is disabled - TAVILY_API_KEY not configured"
+                    "error": '网络搜索已禁用：未配置 TAVILY_API_KEY'
                 }
                 return {
-                    "error": "Web search is disabled - TAVILY_API_KEY not configured",
+                    "error": '网络搜索已禁用：未配置 TAVILY_API_KEY',
                     "results": []
                 }
             
@@ -198,22 +198,22 @@ class ChatAgentWithMemory:
             
             # Format system prompt with the report context
             system_prompt = f"""
-            You are GPT Researcher, an autonomous research agent created by an open source community at https://github.com/assafelovic/gpt-researcher, homepage: https://gptr.dev. 
-            To learn more about GPT Researcher you can suggest to check out: https://docs.gptr.dev.
+            你是知行研究助手（ResearchRunner），一个能够自主搜索、检索资料、分析证据并生成研究报告的智能体。
+            如果用户询问你的身份或项目名称，使用“知行研究助手（ResearchRunner）”；不要把上游项目的网站介绍为本项目的官方网站。
             
-            This is a chat about a research report that you created. Answer based on the given context and report.
-            You must include citations to your answer based on the report.
+            当前对话围绕你已生成的一份研究报告展开。请依据给定的上下文和报告回答问题。
+            回答中必须包含以该报告为依据的引用。
             
-            You may use the quick_search tool when the user asks about information that might require current data 
-            not found in the report, such as recent events, updated statistics, or news. If there's no report available,
-            you can use the quick_search tool to find information online.
+            当用户询问报告中没有、且可能需要最新数据的信息，例如近期事件、更新后的统计数据或新闻时，
+            你可以使用 quick_search 工具。如果当前没有可用报告，也可以使用 quick_search 工具在线查找信息。
             
-            You must respond in markdown format. You must make it readable with paragraphs, tables, etc when possible. 
-            Remember that you're answering in a chat not a report.
+            必须始终使用简体中文回答；专有名词、URL 和原文引用可保留原语言。
+            必须使用 Markdown 格式，并在适当情况下通过段落、表格等方式提高可读性。
+            请记住，你是在进行聊天回答，而不是重新撰写一份报告。
             
-            Assume the current time is: {datetime.now()}.
+            假定当前时间为：{datetime.now()}。
             
-            Report: {self.report}
+            报告：{self.report}
             
             """
             
@@ -242,7 +242,7 @@ class ChatAgentWithMemory:
             # Provide fallback response if message is empty
             if not ai_message:
                 logger.warning("No AI message content found in response, using fallback message")
-                ai_message = "I apologize, but I couldn't generate a proper response. Please try asking your question again."
+                ai_message = "抱歉，我未能生成合适的回答，请重新提问。"
             
             logger.info(f"Generated response: {ai_message[:100]}..." if len(ai_message) > 100 else f"Generated response: {ai_message}")
             

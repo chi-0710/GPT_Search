@@ -1,0 +1,54 @@
+package io.researchrunner.research;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** A3-12: Tavily Extract adapter. */
+public final class TavilyExtractScraper implements SourceCollector.Scraper {
+    private final HttpClient client;
+    private final URI endpoint;
+    private final String key;
+    private final ObjectMapper json;
+    private final Duration timeout;
+
+    public TavilyExtractScraper(HttpClient client, URI endpoint, String key, ObjectMapper json, Duration timeout) {
+        this.client = client;
+        this.endpoint = endpoint;
+        this.key = key;
+        this.json = json;
+        this.timeout = timeout;
+    }
+
+    @Override public SearchGateway.Hit fetch(String url, List<String> domains) throws Exception {
+        if (key == null || key.isBlank()) throw new IllegalStateException("TAVILY_API_KEY 未配置");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("urls", List.of(url));
+        body.put("api_key", key);
+        body.put("include_images", false);
+        var request = HttpRequest.newBuilder(endpoint).timeout(timeout)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body), StandardCharsets.UTF_8))
+                .build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        try (var stream = response.body()) {
+            if (response.statusCode() != 200) throw new IllegalStateException("Tavily Extract 失败，HTTP " + response.statusCode());
+            byte[] bytes = stream.readNBytes(8 * 1024 * 1024 + 1);
+            if (bytes.length > 8 * 1024 * 1024) throw new IllegalStateException("抓取响应过大");
+            var results = json.readTree(bytes).path("results");
+            if (!results.isArray() || results.isEmpty()) throw new IllegalStateException("Tavily Extract 未返回正文");
+            var first = results.get(0);
+            String content = first.path("raw_content").asText("");
+            if (content.isBlank()) throw new IllegalStateException("Tavily Extract 正文为空");
+            String title = first.path("title").asText(url);
+            return new SearchGateway.Hit(url, title, content);
+        }
+    }
+}

@@ -14,11 +14,11 @@ class VisualizerAgent:
         prompt = [
             {
                 "role": "system",
-                "content": "You are a Data Visualizer Agent. Your job is to extract key data points, processes, or timelines from the provided research data and generate a single relevant Mermaid.js diagram (such as a pie chart, flowchart, or timeline) to make the report more user-friendly.",
+                "content": "你是一名数据可视化智能体。你的任务是从所提供的研究资料中提取关键数据点、流程或时间线，并生成一个相关的 Mermaid.js 图表（例如饼图、流程图或时间线），使报告更便于阅读。图表中的可见文字应使用简体中文，专有名词可保留原语言。",
             },
             {
                 "role": "user",
-                "content": f"Research Data:\n{data}\n\nPlease generate a Mermaid diagram block representing the most interesting or structural aspect of this data. Ensure it uses standard markdown ```mermaid ... ``` syntax. If there is absolutely no suitable data for a diagram, return the exact string 'None'."
+                "content": f"研究资料：\n{data}\n\n请生成一个 Mermaid 图表代码块，呈现这些资料中最有价值或最具结构性的内容。必须使用标准 Markdown ```mermaid ... ``` 语法，并让图表中的可见文字使用简体中文。如果完全没有适合绘图的数据，请仅返回字符串 'None'。"
             }
         ]
 
@@ -30,7 +30,7 @@ class VisualizerAgent:
             await self.stream_output(
                 "logs",
                 "visualizing",
-                f"Generating visualizations for the research report...",
+                f"正在为研究报告生成可视化图表...",
                 self.websocket,
             )
         else:
@@ -42,12 +42,12 @@ class VisualizerAgent:
         if "None" not in diagram_output:
             diagrams.append(diagram_output)
             if self.websocket and self.stream_output:
-                await self.stream_output("logs", "visualizing", f"Generated diagrams.", self.websocket)
+                await self.stream_output("logs", "visualizing", f"图表已生成。", self.websocket)
             else:
                 print_agent_output(f"Generated diagrams.", agent="VISUALIZER")
         else:
             if self.websocket and self.stream_output:
-                await self.stream_output("logs", "visualizing", "No suitable data for visualizations.", self.websocket)
+                await self.stream_output("logs", "visualizing", '没有适合可视化的数据。', self.websocket)
             else:
                 print_agent_output("No suitable data for visualizations.", agent="VISUALIZER")
 

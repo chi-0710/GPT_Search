@@ -2,8 +2,8 @@ param([ValidateSet('web','local','hybrid')][string]$Source = 'web', [int]$Port =
 $ErrorActionPreference = 'Stop'
 $taskRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $taskJava = Join-Path $taskRoot 'backend-java'
-$ledgerPath = Join-Path $taskJava 'acceptance/live-runs.json'
 $output = Join-Path $taskJava 'target/live-acceptance'
+$ledgerPath = Join-Path $output 'live-runs.json'
 $name = "researchrunner-live-$PID"
 $network = "$name-net"
 $created = [Collections.Generic.List[string]]::new()

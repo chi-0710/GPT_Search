@@ -1,3 +1,4 @@
+from search.config.config import Config
 from multi_agents.agents import ChiefEditorAgent
 
 chief_editor = ChiefEditorAgent({
@@ -5,11 +6,11 @@ chief_editor = ChiefEditorAgent({
   "max_sections": 3,
   "max_plan_revisions": 3,
   "follow_guidelines": False,
-  "model": "gpt-4o",
+  "model": Config().strategic_llm_model,
   "guidelines": [
-    "The report MUST be written in APA format",
-    "Each sub section MUST include supporting sources using hyperlinks. If none exist, erase the sub section or rewrite it to be a part of the previous section",
-    "The report MUST be written in spanish"
+    "报告必须使用 APA 格式",
+    "每个子章节都必须通过超链接提供支持性来源；如果没有可用来源，请删除该子章节，或将其改写为上一章节的一部分",
+    "报告必须使用简体中文撰写"
   ],
   "verbose": False
 }, websocket=None, stream_output=None)

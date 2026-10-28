@@ -41,14 +41,26 @@ public class ResearchSocket extends TextWebSocketHandler {
             switch(command) {
                 case "start" -> {
                     body.put("generate_in_background",true);
-                    research.report(body,client.run(),true);
+                    try {
+                        research.report(body,client.run(),true);
+                    } catch(IllegalStateException alreadyRunning) {
+                        // Python warns and drops a second start on the same connection.
+                        client.socket().sendMessage(new TextMessage(json.writeValueAsString(Map.of(
+                                "type","logs","content","warning","output","任务正在运行，请稍候。"))));
+                    }
                 }
                 case "human_feedback" -> {
-                    var run=UUID.fromString(Objects.toString(body.get("run_id")));
-                    Object value=body.get("round");
-                    if(!(value instanceof Number number) || number.doubleValue()!=number.intValue()
-                            || !client.run().feedback(run,number.intValue(),Objects.toString(body.get("request_id"),""),
-                                Objects.toString(body.getOrDefault("feedback",body.get("content")),"")))throw new IllegalArgumentException("人工反馈已过期或不属于当前审核");
+                    String feedback=Objects.toString(body.getOrDefault("feedback",body.get("content")),"");
+                    boolean accepted;
+                    if(body.get("run_id")!=null && body.get("round") instanceof Number number
+                            && body.get("request_id")!=null) {
+                        var run=UUID.fromString(Objects.toString(body.get("run_id")));
+                        if(number.doubleValue()!=number.intValue())throw new IllegalArgumentException("人工反馈已过期或不属于当前审核");
+                        accepted=client.run().feedback(run,number.intValue(),Objects.toString(body.get("request_id")),feedback);
+                    } else {
+                        accepted=client.run().feedbackLegacy(feedback);
+                    }
+                    if(!accepted)throw new IllegalArgumentException("人工反馈已过期或不属于当前审核");
                 }
                 case "chat" -> {
                     if(!body.containsKey("messages") && body.get("message") instanceof String question)

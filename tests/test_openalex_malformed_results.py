@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "gpt_researcher" / "retrievers" / "openalex" / "openalex.py"
+MODULE_PATH = ROOT / "search" / "retrievers" / "openalex" / "openalex.py"
 
 
 def _load():
@@ -21,7 +21,7 @@ def _load():
         if "openalex.openalex" in key:
             sys.modules.pop(key, None)
     spec = importlib.util.spec_from_file_location(
-        "gpt_researcher.retrievers.openalex.openalex_testmod", MODULE_PATH
+        "search.retrievers.openalex.openalex_testmod", MODULE_PATH
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

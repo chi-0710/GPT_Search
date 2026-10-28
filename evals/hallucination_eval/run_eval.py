@@ -1,5 +1,5 @@
 """
-Script to run GPT-Researcher queries and evaluate them for hallucination.
+Script to run ResearchRunner queries and evaluate them for hallucination.
 """
 import json
 import logging
@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 
-from gpt_researcher.agent import GPTResearcher
-from gpt_researcher.utils.enum import ReportType, ReportSource, Tone
-from gpt_researcher.utils.logging_config import get_json_handler
+from search.agent import Research
+from search.utils.enum import ReportType, ReportSource, Tone
+from search.utils.logging_config import get_json_handler
 
 from .evaluate import HallucinationEvaluator
 
@@ -32,7 +32,7 @@ DEFAULT_OUTPUT_DIR = "evals/hallucination_eval/results"
 DEFAULT_QUERIES_FILE = "evals/hallucination_eval/inputs/search_queries.jsonl"
 
 class ResearchEvaluator:
-    """Runs GPT-Researcher queries and evaluates responses for hallucination."""
+    """Runs ResearchRunner queries and evaluates responses for hallucination."""
     
     def __init__(self, queries_file: str = DEFAULT_QUERIES_FILE):
         """
@@ -67,7 +67,7 @@ class ResearchEvaluator:
         
     async def run_research(self, query: str) -> Dict:
         """
-        Run a single query through GPT-Researcher.
+        Run a single query through ResearchRunner.
         
         Args:
             query: The search query to research
@@ -75,7 +75,7 @@ class ResearchEvaluator:
         Returns:
             Dict containing research results and context
         """
-        researcher = GPTResearcher(
+        researcher = Research(
             query=query,
             report_type=ReportType.ResearchReport.value,
             report_format="markdown",
@@ -219,7 +219,7 @@ async def main(num_queries: int = 5, output_dir: str = DEFAULT_OUTPUT_DIR):
         print("No responses could be evaluated due to missing source text")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run GPT-Researcher evaluation")
+    parser = argparse.ArgumentParser(description="Run ResearchRunner evaluation")
     parser.add_argument("-n", "--num-queries", type=int, default=5,
                       help="Number of queries to evaluate")
     parser.add_argument("-o", "--output-dir", type=str, default=DEFAULT_OUTPUT_DIR,

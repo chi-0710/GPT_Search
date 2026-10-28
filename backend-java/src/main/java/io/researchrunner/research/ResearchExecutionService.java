@@ -47,15 +47,22 @@ public class ResearchExecutionService {
         String mode=ReportMode.normalize(Objects.toString(request.getOrDefault("report_type","multi_agents")));
         String tone=Objects.toString(request.getOrDefault("tone","Objective"));
         if(query.isBlank() || !Set.of("web","local","hybrid").contains(source))throw invalid("研究问题或来源无效");
-        if(!list(request,"document_urls").isEmpty())throw invalid("此 Java 研究入口尚不支持远程文档 URL");
+        List<String> documentUrls=strings(request,"document_urls");
+        List<Map<String,Object>> remoteDocuments=List.of();
+        if(!documentUrls.isEmpty()) {
+            int maxMb=env.getProperty("MAX_BLOB_SIZE_MB",Integer.class,50);
+            remoteDocuments=new RemoteDocuments(Duration.ofSeconds(6),Math.max(1,maxMb)*1024*1024).fetch(documentUrls);
+        }
+        String mcpStrategy=Objects.toString(request.getOrDefault("mcp_strategy","fast"));
+        if(!Set.of("fast","deep","disabled").contains(mcpStrategy))throw invalid("MCP 策略无效");
         var mcpConfigs=McpResearch.parse(list(request,"mcp_configs"),env);
-        if(Boolean.TRUE.equals(request.get("mcp_enabled")) && mcpConfigs.isEmpty())throw invalid("启用 MCP 必须提供服务器配置");
+        if(mcpStrategy.equals("disabled"))mcpConfigs=List.of();
+        if(Boolean.TRUE.equals(request.get("mcp_enabled")) && mcpConfigs.isEmpty() && !mcpStrategy.equals("disabled"))throw invalid("启用 MCP 必须提供服务器配置");
         if(!mcpConfigs.isEmpty() && (source.equals("local") || !strings(request,"query_domains").isEmpty() || !strings(request,"source_urls").isEmpty()))
             throw invalid("MCP 暂不支持文件限定或 URL/域名限定研究，禁止扩大来源范围");
-        if(!mcpConfigs.isEmpty() && !Objects.toString(request.getOrDefault("mcp_strategy","fast")).equals("fast"))throw invalid("当前 MCP 仅支持 fast 策略");
-        if(request.get("headers") instanceof Map<?,?> headers && !headers.isEmpty())throw invalid("此入口尚不支持请求级模型配置覆盖");
-        if(!env.getProperty("LLM_KWARGS","{}").strip().equals("{}"))throw invalid("此入口尚不支持 LLM_KWARGS");
-        if(env.getProperty("IMAGE_GENERATION_ENABLED",Boolean.class,false))throw invalid("此入口尚不支持生成图片");
+        Map<String,String> headers=stringMap(request.get("headers"));
+        var llmKwargs=llmKwargs();
+        ScraperFactory.requireSupported(env.getProperty("SCRAPER","bs"));
         var optionsConfig=ResearchOptions.parse(request,env,query,tone);
         if(optionsConfig.humanReview() && !interactive)throw invalid("人工审核需要 WebSocket 审核通道");
         List<UUID> scope=new ArrayList<>();
@@ -66,17 +73,21 @@ public class ResearchExecutionService {
             catch(IllegalArgumentException e){throw invalid(e.getMessage());}
         }
         int limit=request.get("max_search_results") instanceof Number n?n.intValue():env.getProperty("MAX_SEARCH_RESULTS_PER_QUERY",Integer.class,5);
-        var selection=new SourceCollector.Selection(source,scope,strings(request,"query_domains"),strings(request,"source_urls"),limit);
+        var selection=new SourceCollector.Selection(source,scope,strings(request,"query_domains"),strings(request,"source_urls"),limit,remoteDocuments);
         String retriever=env.getProperty("RETRIEVER","tavily");
-        if(!source.equals("local") && (!Set.of("tavily","mcp").contains(retriever) || (retriever.equals("mcp") && mcpConfigs.isEmpty())))throw invalid("研究检索器未接入或 MCP 配置为空");
-        var usage=new UsageLedger();var model=new SpringResearchModel(binding("FAST",6000),binding("SMART",12000),binding("STRATEGIC",8000),usage,json);
+        if(!source.equals("local") && retriever.equals("mcp") && mcpConfigs.isEmpty())throw invalid("MCP 配置为空，无法执行 MCP 研究");
+        if(!source.equals("local") && !retriever.equals("mcp"))ProviderCatalog.require(ProviderCatalog.Kind.SEARCH,retriever);
+        var usage=new UsageLedger();var chatModels=new ConfiguredChatModels(env);
+        var model=new SpringResearchModel(chatModels.binding("FAST",6000,llmKwargs),chatModels.binding("SMART",12000,llmKwargs),
+                chatModels.binding("STRATEGIC",8000,llmKwargs),usage,json);
         Map<String,Object> options=new LinkedHashMap<>(request);options.put("resolved_document_ids",scope.stream().map(UUID::toString).toList());
         options.put("execution_backend","java");
         options.put("mcp_configs",mcpConfigs.stream().map(c->Map.of("name",c.name(),"transport",c.transport())).toList());
         var run=connection.create(()->runs.create(query,mode,source,tone,options));
         active.add(connection);
+        var effectiveMcp=List.copyOf(mcpConfigs);var effectiveStrategy=mcpStrategy;
         Callable<Map<String,Object>> work=()->{
-            try{return execute(run,query,tone,selection,model,usage,optionsConfig,connection,mcpConfigs);}
+            try{return execute(run,query,tone,selection,model,usage,optionsConfig,connection,effectiveMcp,headers,effectiveStrategy);}
             finally{active.remove(connection);}
         };
         if(!Boolean.FALSE.equals(request.get("generate_in_background"))) {
@@ -91,16 +102,17 @@ public class ResearchExecutionService {
         }
         return work.call();
     }
-    private Map<String,Object> execute(RunStore.Identity run,String query,String tone,SourceCollector.Selection selection,ResearchNodes.Model model,UsageLedger usage,ResearchOptions options,ResearchConnection connection,List<McpResearch.Config> mcpConfigs) throws Exception {
-        try(var mcp=mcpConfigs.isEmpty()?null:new McpResearch(json,Duration.ofSeconds(60),mcpRoots())) {
+    private Map<String,Object> execute(RunStore.Identity run,String query,String tone,SourceCollector.Selection selection,ResearchNodes.Model model,UsageLedger usage,ResearchOptions options,ResearchConnection connection,List<McpResearch.Config> mcpConfigs,Map<String,String> headers,String mcpStrategy) throws Exception {
+        try(var mcp=mcpConfigs.isEmpty()?null:new McpResearch(json,Duration.ofSeconds(60),mcpRoots(),mcpStrategy,env.getProperty("MAX_ITERATIONS",Integer.class,3))) {
             if(mcp!=null)connection.call(()->{mcp.connect(mcpConfigs);return null;});
             var evidence=new EvidenceRegistry(run.runId());
             ResearchNodes.Model cancellableModel=(stage,instruction,input)->connection.call(()->model.generate(stage,instruction,input));
-            var search=new TavilySearch(HttpClient.newHttpClient(),URI.create("https://api.tavily.com/search"),env.getProperty("TAVILY_API_KEY"),json,Duration.ofSeconds(100));
-            var scraper=new WebScraper(Duration.ofSeconds(60),8*1024*1024);
+            String retriever=env.getProperty("RETRIEVER","tavily");
+            var search=retriever.equals("mcp")?SearchProviderFactory.none():SearchProviderFactory.create(retriever,env,json,headers);
+            var scraper=ScraperFactory.create(env.getProperty("SCRAPER","bs"),env,json);
             var sources=new SourceCollector(selection,
                     (q,ids)->connection.call(()->documents.retrieve(q,ids)),
-                    (q,domains,limit)->env.getProperty("RETRIEVER","tavily").equals("mcp")?List.of():connection.call(()->search.search(q,domains,limit)),
+                    (q,domains,limit)->connection.call(()->search.search(q,domains,limit)),
                     (url,domains)->connection.call(()->scraper.fetch(url,domains)),evidence,
                     mcp==null?null:q->connection.call(()->mcp.collect(q,cancellableModel)));
             var paths=new LinkedHashMap<String,String>();
@@ -110,16 +122,21 @@ public class ResearchExecutionService {
                 progress.emit("human_review_skipped","未启用人工审核");return new ResearchNodes.Decision(true,"");
             };
             var figures=new ArrayList<io.researchrunner.report.ReportFigure>();
+            var generatedImages=new java.util.concurrent.atomic.AtomicReference<List<Map<String,Object>>>(List.of());
             ResearchNodes.Visualizer visualizer=env.getProperty("JAVA_VISUALIZATION_ENABLED",Boolean.class,true)
                     ?new ResearchVisualization(cancellableModel,evidence,progress,run.runId(),figures::add,env.getProperty("PUBLIC_API_URL","http://localhost:8000"))
                     :markdown->{progress.emit("visualization_skipped","配置已禁用可视化");return markdown;};
             var nodes=new ResearchNodes(settings,sources,evidence,cancellableModel,human,visualizer,
                     (markdown,snapshots,warnings)->{
-                        paths.putAll(connection.publish(publication,new ResearchResult(markdown,snapshots,usage.snapshot(),snapshots,warnings),options.pdf(),options.docx(),figures));
+                        var images=ReportImages.enrich(markdown,query,env,json,env.getProperty("PUBLIC_API_URL","http://localhost:8000"));
+                        generatedImages.set(ReportImages.infos(images.images()));
+                        var allFigures=new ArrayList<>(figures);allFigures.addAll(images.figures());
+                        var allWarnings=new ArrayList<>(warnings);allWarnings.addAll(images.warnings());
+                        paths.putAll(connection.publish(publication,new ResearchResult(images.markdown(),snapshots,usage.snapshot(),snapshots,allWarnings),options.pdf(),options.docx(),allFigures));
                     },progress,connection::cancelled);
             connection.emit(Map.of("type","research_started","content","research_started","run_id",run.runId(),"research_id",run.researchId(),"output",run.researchId()));
             var result=connection.call(()->ResearchWorkflow.compile(nodes.actions(),options.planLimit(),options.factLimit()).invoke(GraphInput.noArgs(),RunnableConfig.empty()).orElseThrow());
-            return Map.of("research_id",run.researchId(),"run_id",run.runId(),"report",result.data().get("report"),"evidence_url","/api/research-runs/"+run.runId()+"/evidence","md_path",paths.get("md"),"pdf_path",paths.getOrDefault("pdf",""),"docx_path",paths.getOrDefault("docx",""),"research_information",Map.of("source_urls",evidence.snapshots().stream().map(e->e.get("url")).toList(),"research_costs",usage.snapshot(),"visited_urls",evidence.snapshots().stream().map(e->e.get("url")).toList(),"research_images",List.of()));
+            return Map.of("research_id",run.researchId(),"run_id",run.runId(),"report",result.data().get("report"),"evidence_url","/api/research-runs/"+run.runId()+"/evidence","md_path",paths.get("md"),"pdf_path",paths.getOrDefault("pdf",""),"docx_path",paths.getOrDefault("docx",""),"research_information",Map.of("source_urls",evidence.snapshots().stream().map(e->e.get("url")).toList(),"research_costs",compatibleCosts(usage.snapshot()),"visited_urls",evidence.snapshots().stream().map(e->e.get("url")).toList(),"research_images",generatedImages.get()));
         } catch(Exception e){
             if(connection.cancelled() || e instanceof CancellationException || e instanceof InterruptedException)connection.close();
             else {
@@ -129,7 +146,47 @@ public class ResearchExecutionService {
             throw e;
         }
     }
-    private SpringResearchModel.Binding binding(String role,int tokens) {return new ConfiguredChatModels(env).binding(role,tokens);}
+    private Map<String,Object> llmKwargs() {
+        String raw=env.getProperty("LLM_KWARGS","{}");
+        if(raw==null || raw.isBlank() || raw.strip().equals("{}"))return Map.of();
+        try {
+            var node=json.readTree(raw);
+            if(!node.isObject())throw invalid("LLM_KWARGS 必须是 JSON 对象");
+            Map<String,Object> values=new LinkedHashMap<>();
+            var fields=node.fields();
+            while(fields.hasNext()) {
+                var entry=fields.next();
+                switch(entry.getKey()) {
+                    case "temperature" -> values.put("temperature",entry.getValue().asDouble());
+                    case "max_tokens","max_completion_tokens" -> values.put("max_tokens",entry.getValue().asInt());
+                    default -> throw invalid("尚未迁移的 LLM_KWARGS 键："+entry.getKey());
+                }
+            }
+            return values;
+        } catch(java.io.IOException error) {
+            throw invalid("LLM_KWARGS 必须是有效的 JSON");
+        }
+    }
+    private static Map<String,String> stringMap(Object raw) {
+        if(raw==null)return Map.of();
+        if(!(raw instanceof Map<?,?> map))throw invalid("headers 必须是对象");
+        Map<String,String> result=new LinkedHashMap<>();
+        map.forEach((key,value)->{
+            if(!(key instanceof String name) || !(value instanceof String text))throw invalid("headers 必须是字符串键值");
+            result.put(name,text);
+        });
+        return result;
+    }
+    /** Python exposes {total, research, agents}; unknown independent costs stay null, not zero. */
+    private static Map<String,Object> compatibleCosts(Map<String,Object> snapshot) {
+        Map<String,Object> costs=new LinkedHashMap<>();
+        costs.put("total",null);
+        costs.put("research",null);
+        costs.put("agents",snapshot.get("model_cost_usd"));
+        costs.put("status",snapshot.get("total_cost_status"));
+        costs.put("detail",snapshot);
+        return costs;
+    }
     private List<java.nio.file.Path> mcpRoots() throws java.io.IOException {
         List<java.nio.file.Path> roots=new ArrayList<>();
         for(String root:env.getProperty("JAVA_MCP_ALLOWED_ROOTS","").split(";"))if(!root.isBlank())roots.add(java.nio.file.Path.of(root).toRealPath());

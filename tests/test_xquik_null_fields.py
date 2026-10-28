@@ -15,7 +15,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from gpt_researcher.retrievers.xquik.xquik import XquikSearch
+from search.retrievers.xquik.xquik import XquikSearch
 
 
 class TestXquikNullFields(unittest.TestCase):

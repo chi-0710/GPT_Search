@@ -1,22 +1,11 @@
+from search.utils.report_modes import normalize_report_mode
 import asyncio
 import json
 import os
-import re
-import time
-import shutil
 import traceback
-from typing import Awaitable, Dict, List, Any
-from fastapi.responses import JSONResponse, FileResponse
-from gpt_researcher.document.document import DocumentLoader
-from gpt_researcher import GPTResearcher
-from utils import write_md_to_pdf, write_md_to_word, write_text_to_md
-from pathlib import Path
-from datetime import datetime
-from fastapi import HTTPException
+from typing import Awaitable, Dict, Any
 import logging
-import hashlib
 
-from .multi_agent_runner import run_multi_agent_task
 
 # Import chat agent
 try:
@@ -32,99 +21,25 @@ logger = logging.getLogger(__name__)
 
 class CustomLogsHandler:
     """Custom handler to capture streaming logs from the research process"""
-    def __init__(self, websocket, task: str):
-        self.logs = []
+    def __init__(self, websocket, task: str, *, store=None, run_id=None, research_id=None):
         self.websocket = websocket
-        sanitized_filename = sanitize_filename(f"task_{int(time.time())}_{task}")
-        self.log_file = os.path.join("outputs", f"{sanitized_filename}.json")
-        self.timestamp = datetime.now().isoformat()
-        # Initialize log file with metadata
-        os.makedirs("outputs", exist_ok=True)
-        with open(self.log_file, 'w') as f:
-            json.dump({
-                "timestamp": self.timestamp,
-                "events": [],
-                "content": {
-                    "query": "",
-                    "sources": [],
-                    "context": [],
-                    "report": "",
-                    "costs": 0.0
-                }
-            }, f, indent=2)
+        self.store = store
+        self.run_id = run_id
+        self.research_id = research_id
 
-    async def send_json(self, data: Dict[str, Any]) -> None:
+    async def send_json(self, data: Dict[str, Any], *, persist: bool = True) -> None:
         """Store log data and send to websocket"""
-        # Send to websocket for real-time display
+        if persist and self.store and self.run_id:
+            await self.store.append_event(self.run_id, data)
         if self.websocket:
-            await self.websocket.send_json(data)
-            
-        # Read current log file
-        with open(self.log_file, 'r') as f:
-            log_data = json.load(f)
-            
-        # Update appropriate section based on data type
-        if data.get('type') == 'logs':
-            log_data['events'].append({
-                "timestamp": datetime.now().isoformat(),
-                "type": "event",
-                "data": data
-            })
-        else:
-            # Update content section for other types of data
-            log_data['content'].update(data)
-            
-        # Save updated log file
-        with open(self.log_file, 'w') as f:
-            json.dump(log_data, f, indent=2)
-
-
-class Researcher:
-    def __init__(self, query: str, report_type: str = "research_report"):
-        self.query = query
-        self.report_type = report_type
-        # Generate unique ID for this research task
-        self.research_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{hash(query)}"
-        # Initialize logs handler with research ID
-        self.logs_handler = CustomLogsHandler(None, self.research_id)
-        self.researcher = GPTResearcher(
-            query=query,
-            report_type=report_type,
-            websocket=self.logs_handler
-        )
-
-    async def research(self) -> dict:
-        """Conduct research and return paths to generated files"""
-        await self.researcher.conduct_research()
-        report = await self.researcher.write_report()
-        
-        # Generate the files
-        sanitized_filename = sanitize_filename(f"task_{int(time.time())}_{self.query}")
-        file_paths = await generate_report_files(report, sanitized_filename)
-        
-        # Get the JSON log path that was created by CustomLogsHandler
-        json_relative_path = os.path.relpath(self.logs_handler.log_file)
-        
-        return {
-            "output": {
-                **file_paths,  # Include PDF, DOCX, and MD paths
-                "json": json_relative_path
-            }
-        }
-
-def sanitize_filename(filename: str) -> str:
-    # Split into components
-    prefix, timestamp, *task_parts = filename.split('_')
-    task = '_'.join(task_parts)
-    task_hash = hashlib.md5(task.encode('utf-8', errors='ignore')).hexdigest()[:10]
-            
-    # Reassemble and clean the filename
-    sanitized = f"{prefix}_{timestamp}_{task_hash}"
-    return re.sub(r"[^\w\s-]", "", sanitized).strip()
-
+            try:
+                await self.websocket.send_json(data)
+            except Exception:
+                logger.info("WebSocket delivery failed after event persistence")
 
 async def handle_start_command(websocket, data: str, manager):
     json_data = json.loads(data[6:])
+    json_data["report_type"] = normalize_report_mode(json_data.get("report_type"))
     (
         task,
         report_type,
@@ -144,44 +59,117 @@ async def handle_start_command(websocket, data: str, manager):
         print("Error: Missing task or report_type")
         return
 
-    # Create logs handler with websocket and task
-    logs_handler = CustomLogsHandler(websocket, task)
-    # Initialize log content with query
-    await logs_handler.send_json({
-        "query": task,
-        "sources": [],
-        "context": [],
-        "report": ""
-    })
-
-    sanitized_filename = sanitize_filename(f"task_{int(time.time())}_{task}")
-
-    report = await manager.start_streaming(
-        task,
-        report_type,
-        report_source,
-        source_urls,
-        document_urls,
-        tone,
-        websocket,
-        headers,
-        query_domains,
-        mcp_enabled,
-        mcp_strategy,
-        mcp_configs,
-        max_search_results,
+    from .document_service import resolve_document_scope
+    resolved_document_ids = await resolve_document_scope(manager.store, json_data)
+    json_data["resolved_document_ids"] = resolved_document_ids
+    run = await manager.store.create_run(
+        query=task,
+        report_type=report_type,
+        report_source=report_source or "web",
+        tone=tone or "Objective",
+        request_options=json_data,
     )
-    report = str(report)
-    file_paths = await generate_report_files(report, sanitized_filename)
-    # Add JSON log path to file_paths
-    file_paths["json"] = os.path.relpath(logs_handler.log_file)
-    await send_file_paths(websocket, file_paths)
+    logs_handler = CustomLogsHandler(
+        websocket,
+        task,
+        store=manager.store,
+        run_id=run["run_id"],
+        research_id=run["research_id"],
+    )
+    await logs_handler.send_json({
+        "type": "research_started",
+        "content": "research_started",
+        "research_id": run["research_id"],
+        "run_id": run["run_id"],
+        "output": run["research_id"],
+    })
+    try:
+        result = await manager.start_streaming(
+            task,
+            report_type,
+            report_source,
+            source_urls,
+            document_urls,
+            tone,
+            websocket,
+            headers,
+            query_domains,
+            mcp_enabled,
+            mcp_strategy,
+            mcp_configs,
+            max_search_results,
+            logs_handler=logs_handler,
+            run_id=run["run_id"],
+            research_id=run["research_id"],
+            document_ids=resolved_document_ids,
+        )
+        report = result.report
+        sources = result.sources
+        costs = result.costs
+        file_paths = await generate_report_files(
+            report,
+            run["research_id"],
+            store=manager.store,
+            report_public_id=run["research_id"],
+            run_id=run["run_id"],
+        )
+        path_event = {"type": "path", "output": file_paths}
+        await manager.store.append_event(run["run_id"], path_event)
+        await manager.store.complete_run(
+            run["run_id"], answer=report, costs=costs, sources=sources
+        )
+        await logs_handler.send_json(path_event, persist=False)
+    except asyncio.CancelledError:
+        await manager.store.fail_run(run["run_id"], "Research task cancelled after client disconnect")
+        try:
+            await logs_handler.send_json({
+                "type": "logs",
+                "content": "error",
+                "output": '客户端断开连接后，研究任务已取消',
+            })
+        except Exception:
+            logger.warning("Could not publish cancellation event", exc_info=True)
+        raise
+    except Exception as exc:
+        await logs_handler.send_json({
+            "type": "logs", "content": "error", "output": f"错误：{exc}"
+        })
+        await manager.store.fail_run(run["run_id"], str(exc))
 
 
-async def handle_human_feedback(data: str):
-    feedback_data = json.loads(data[14:])  # Remove "human_feedback" prefix
-    print(f"Received human feedback: {feedback_data}")
-    # TODO: Add logic to forward the feedback to the appropriate agent or update the research state
+def parse_human_feedback(data: str) -> str:
+    """Parse the structured feedback message sent by the web client."""
+    payload = data.strip()
+    legacy_prefix = "human_feedback"
+    if payload.startswith(legacy_prefix):
+        payload = payload[len(legacy_prefix):].lstrip()
+
+    feedback_data = json.loads(payload)
+    if not isinstance(feedback_data, dict) or feedback_data.get("type") != "human_feedback":
+        raise ValueError('人工反馈消息无效')
+
+    feedback = feedback_data.get("content")
+    if not isinstance(feedback, str):
+        raise ValueError('人工反馈内容必须是字符串')
+    return feedback
+
+
+def is_human_feedback_message(data: str) -> bool:
+    try:
+        parse_human_feedback(data)
+        return True
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return False
+
+
+async def handle_human_feedback(data: str, websocket):
+    feedback = parse_human_feedback(data)
+    feedback_queue = getattr(websocket.state, "human_feedback_queue", None)
+    if feedback_queue is None:
+        raise RuntimeError('人工反馈队列尚未初始化')
+
+    await feedback_queue.put(feedback)
+    logger.info("Received human feedback")
 
 
 async def handle_chat_command(websocket, data: str):
@@ -202,7 +190,7 @@ async def handle_chat_command(websocket, data: str):
         if not messages:
             await websocket.send_json({
                 "type": "chat",
-                "content": "No message provided.",
+                "content": '未提供消息。',
                 "role": "assistant"
             })
             return
@@ -211,7 +199,7 @@ async def handle_chat_command(websocket, data: str):
         if ChatAgentWithMemory is None:
             await websocket.send_json({
                 "type": "chat",
-                "content": "Chat functionality is not available. Please check the server configuration.",
+                "content": '聊天功能不可用。请检查服务器配置。',
                 "role": "assistant"
             })
             return
@@ -242,86 +230,34 @@ async def handle_chat_command(websocket, data: str):
         logger.error(f"Failed to parse chat data: {e}")
         await websocket.send_json({
             "type": "chat",
-            "content": f"Error: Invalid message format - {str(e)}",
+            "content": f"错误：消息格式无效——{str(e)}",
             "role": "assistant"
         })
     except Exception as e:
         logger.error(f"Error handling chat command: {e}\n{traceback.format_exc()}")
         await websocket.send_json({
             "type": "chat",
-            "content": f"Error processing your message: {str(e)}",
+            "content": f"处理你的消息时出错：{str(e)}",
             "role": "assistant"
         })
 
-async def generate_report_files(report: str, filename: str) -> Dict[str, str]:
-    pdf_path = await write_md_to_pdf(report, filename)
-    docx_path = await write_md_to_word(report, filename)
-    md_path = await write_text_to_md(report, filename)
-    return {"pdf": pdf_path, "docx": docx_path, "md": md_path}
-
-
-async def send_file_paths(websocket, file_paths: Dict[str, str]):
-    await websocket.send_json({"type": "path", "output": file_paths})
-
-
-def get_config_dict(
-    langchain_api_key: str, openai_api_key: str, tavily_api_key: str,
-    google_api_key: str, google_cx_key: str, bing_api_key: str,
-    searchapi_api_key: str, serpapi_api_key: str, serper_api_key: str, searx_url: str
+async def generate_report_files(
+    report: str,
+    filename: str,
+    *,
+    store,
+    report_public_id: str,
+    run_id: str,
 ) -> Dict[str, str]:
-    return {
-        "LANGCHAIN_API_KEY": langchain_api_key or os.getenv("LANGCHAIN_API_KEY", ""),
-        "OPENAI_API_KEY": openai_api_key or os.getenv("OPENAI_API_KEY", ""),
-        "TAVILY_API_KEY": tavily_api_key or os.getenv("TAVILY_API_KEY", ""),
-        "GOOGLE_API_KEY": google_api_key or os.getenv("GOOGLE_API_KEY", ""),
-        "GOOGLE_CX_KEY": google_cx_key or os.getenv("GOOGLE_CX_KEY", ""),
-        "BING_API_KEY": bing_api_key or os.getenv("BING_API_KEY", ""),
-        "SEARCHAPI_API_KEY": searchapi_api_key or os.getenv("SEARCHAPI_API_KEY", ""),
-        "SERPAPI_API_KEY": serpapi_api_key or os.getenv("SERPAPI_API_KEY", ""),
-        "SERPER_API_KEY": serper_api_key or os.getenv("SERPER_API_KEY", ""),
-        "SEARX_URL": searx_url or os.getenv("SEARX_URL", ""),
-        "LANGCHAIN_TRACING_V2": os.getenv("LANGCHAIN_TRACING_V2", "true"),
-        "DOC_PATH": os.getenv("DOC_PATH", "./my-docs"),
-        "RETRIEVER": os.getenv("RETRIEVER", ""),
-        "EMBEDDING_MODEL": os.getenv("OPENAI_EMBEDDING_MODEL", "")
-    }
+    from .artifact_service import persist_report_artifacts
 
-
-def update_environment_variables(config: Dict[str, str]):
-    for key, value in config.items():
-        os.environ[key] = value
-
-
-async def handle_file_upload(file, DOC_PATH: str) -> Dict[str, str]:
-    file_path = os.path.join(DOC_PATH, os.path.basename(file.filename))
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    print(f"File uploaded to {file_path}")
-
-    document_loader = DocumentLoader(DOC_PATH)
-    await document_loader.load()
-
-    return {"filename": file.filename, "path": file_path}
-
-
-async def handle_file_deletion(filename: str, DOC_PATH: str) -> JSONResponse:
-    file_path = os.path.join(DOC_PATH, os.path.basename(filename))
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        print(f"File deleted: {file_path}")
-        return JSONResponse(content={"message": "File deleted successfully"})
-    else:
-        print(f"File not found: {file_path}")
-        return JSONResponse(status_code=404, content={"message": "File not found"})
-
-
-async def execute_multi_agents(manager) -> Any:
-    websocket = manager.active_connections[0] if manager.active_connections else None
-    if websocket:
-        report = await run_multi_agent_task("Is AI in a hype cycle?", websocket, stream_output)
-        return {"report": report}
-    else:
-        return JSONResponse(status_code=400, content={"message": "No active WebSocket connection"})
+    return await persist_report_artifacts(
+        store,
+        report_public_id=report_public_id,
+        run_id=run_id,
+        markdown=report,
+        legacy_stem=filename,
+    )
 
 
 async def handle_websocket_communication(websocket, manager):
@@ -340,7 +276,7 @@ async def handle_websocket_communication(websocket, manager):
                     {
                         "type": "logs",
                         "content": "error",
-                        "output": f"Error: {e}",
+                        "output": f"错误：{e}",
                     }
                 )
 
@@ -354,6 +290,9 @@ async def handle_websocket_communication(websocket, manager):
                 
                 if data == "ping":
                     await websocket.send_text("pong")
+                elif is_human_feedback_message(data):
+                    logger.info("Processing human_feedback command")
+                    await handle_human_feedback(data, websocket)
                 elif running_task and not running_task.done():
                     # discard any new request if a task is already running
                     logger.warning(
@@ -363,7 +302,7 @@ async def handle_websocket_communication(websocket, manager):
                         {
                             "type": "logs",
                             "content": "warning",
-                            "output": "Task already running. Please wait.",
+                            "output": '任务正在运行，请稍候。',
                         }
                     )
                 # Normalize command detection by checking startswith after stripping whitespace
@@ -372,9 +311,6 @@ async def handle_websocket_communication(websocket, manager):
                     running_task = run_long_running_task(
                         handle_start_command(websocket, data, manager)
                     )
-                elif data.strip().startswith("human_feedback"):
-                    logger.info(f"Processing human_feedback command")
-                    running_task = run_long_running_task(handle_human_feedback(data))
                 elif data.strip().startswith("chat"):
                     logger.info(f"Processing chat command")
                     running_task = run_long_running_task(handle_chat_command(websocket, data))
@@ -385,7 +321,7 @@ async def handle_websocket_communication(websocket, manager):
                     await websocket.send_json({
                         "type": "error",
                         "content": "error",
-                        "output": "Unknown command received by server"
+                        "output": '服务器收到未知命令'
                     })
             except Exception as e:
                 logger.error(f"WebSocket error: {str(e)}\n{traceback.format_exc()}")
@@ -394,6 +330,10 @@ async def handle_websocket_communication(websocket, manager):
     finally:
         if running_task and not running_task.done():
             running_task.cancel()
+            try:
+                await running_task
+            except asyncio.CancelledError:
+                pass
 
 def extract_command_data(json_data: Dict) -> tuple:
     return (
@@ -401,9 +341,9 @@ def extract_command_data(json_data: Dict) -> tuple:
         json_data.get("report_type"),
         json_data.get("source_urls"),
         json_data.get("document_urls"),
-        json_data.get("tone"),
+        json_data.get("tone") or "Objective",
         json_data.get("headers", {}),
-        json_data.get("report_source"),
+        json_data.get("report_source") or "web",
         json_data.get("query_domains", []),
         json_data.get("mcp_enabled", False),
         json_data.get("mcp_strategy", "fast"),

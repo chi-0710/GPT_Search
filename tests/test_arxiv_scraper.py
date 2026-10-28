@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gpt_researcher.scraper.arxiv.arxiv import ArxivScraper, _paper_id_from_link
+from search.scraper.arxiv.arxiv import ArxivScraper, _paper_id_from_link
 
 
 def test_paper_id_from_abs_and_pdf_urls():

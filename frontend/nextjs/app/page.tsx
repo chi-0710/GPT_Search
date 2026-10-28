@@ -1,20 +1,16 @@
 "use client";
+import { validateResearchSettings } from "@/utils/researchSettings";
 
 import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useResearchHistoryContext } from '@/hooks/ResearchHistoryContext';
 import { useScrollHandler } from '@/hooks/useScrollHandler';
-import { startLanggraphResearch } from '../components/Langgraph/Langgraph';
-import findDifferences from '../helpers/findDifferences';
 import { Data, ChatBoxSettings, QuestionData, ChatMessage, ChatData } from '../types/data';
 import { preprocessOrderedData } from '../utils/dataProcessing';
 import { toast } from "react-hot-toast";
-import { v4 as uuidv4 } from 'uuid';
 
 import Hero from "@/components/Hero";
-import ResearchPageLayout from "@/components/layouts/ResearchPageLayout";
-import CopilotLayout from "@/components/layouts/CopilotLayout";
 import ResearchContent from "@/components/research/ResearchContent";
 import CopilotResearchContent from "@/components/research/CopilotResearchContent";
 import HumanFeedback from "@/components/HumanFeedback";
@@ -36,31 +32,23 @@ export default function Home() {
   const [chatBoxSettings, setChatBoxSettings] = useState<ChatBoxSettings>(() => {
     // Default settings
     const defaultSettings = {
-      report_type: "research_report",
-      report_source: "web",
+      report_type: "multi_agents",
+      report_source: "hybrid",
+      document_scope: "all" as const,
+      document_ids: [],
       tone: "Objective",
       domains: [],
-      defaultReportType: "research_report",
+      defaultReportType: "multi_agents",
       layoutType: 'copilot',
       mcp_enabled: false,
       mcp_configs: [],
       mcp_strategy: "fast",
     };
 
-    // Try to load all settings from localStorage
+    // Persist only the visual layout; research parameters are session-scoped.
     if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('chatBoxSettings');
-      if (savedSettings) {
-        try {
-          const parsedSettings = JSON.parse(savedSettings);
-          return {
-            ...defaultSettings,
-            ...parsedSettings, // Override defaults with saved settings
-          };
-        } catch (e) {
-          console.error('Error parsing saved settings:', e);
-        }
-      }
+      const savedLayout = localStorage.getItem('gptrUiLayout');
+      if (savedLayout) return { ...defaultSettings, layoutType: savedLayout };
     }
     return defaultSettings;
   });
@@ -102,25 +90,21 @@ export default function Home() {
     getResearchById, 
     deleteResearch,
     addChatMessage,
-    getChatMessages
+    getChatMessages,
+    refreshHistory,
   } = useResearchHistoryContext();
 
-  // Only initialize the WebSocket hook reference, don't connect automatically
-  const websocketRef = useRef(useWebSocket(
+  const { socket, initializeWebSocket, closeConnection, sendHumanFeedback } = useWebSocket(
     setOrderedData,
     setAnswer,
     setLoading,
     setShowHumanFeedback,
-    setQuestionForHuman
-  ));
-  
-  // Use the reference to access websocket functions
-  const { socket, initializeWebSocket } = websocketRef.current;
+    setQuestionForHuman,
+    (researchId) => setCurrentResearchId(researchId),
+  );
 
   const handleFeedbackSubmit = (feedback: string | null) => {
-    if (socket) {
-      socket.send(JSON.stringify({ type: 'human_feedback', content: feedback }));
-    }
+    sendHumanFeedback(feedback);
     setShowHumanFeedback(false);
   };
 
@@ -220,7 +204,7 @@ export default function Home() {
           // Show error message
           setOrderedData(prevOrder => [...prevOrder, { 
             type: 'chat', 
-            content: 'Sorry, something went wrong. Please try again.' 
+            content: '抱歉，出现了问题，请重试。'
           } as ChatData]);
         }
       } catch (error) {
@@ -229,7 +213,7 @@ export default function Home() {
         // Add error message
         setOrderedData(prevOrder => [...prevOrder, { 
           type: 'chat', 
-          content: 'Sorry, there was an error processing your request. Please try again.' 
+          content: '抱歉，处理你的请求时发生错误，请重试。'
         } as ChatData]);
       } finally {
         setIsProcessingChat(false);
@@ -276,7 +260,7 @@ export default function Home() {
           // Show error message in results
           setOrderedData(prevOrder => [...prevOrder, { 
             type: 'chat', 
-            content: 'I apologize, but I couldn\'t generate a proper response. Please try asking your question again.' 
+            content: '抱歉，未能生成合适的回答，请重新提问。'
           }]);
         } else {
           // Add AI response to chat history asynchronously
@@ -304,7 +288,7 @@ export default function Home() {
         // Show error message
         setOrderedData(prevOrder => [...prevOrder, { 
           type: 'chat', 
-          content: 'Sorry, something went wrong. Please try again.' 
+          content: '抱歉，出现了问题，请重试。'
         }]);
       }
     } catch (error) {
@@ -313,7 +297,7 @@ export default function Home() {
       // Add error message to display
       setOrderedData(prevOrder => [...prevOrder, { 
         type: 'chat', 
-        content: 'Sorry, there was an error processing your request. Please try again.' 
+        content: '抱歉，处理你的请求时发生错误，请重试。'
       }]);
     } finally {
       setLoading(false);
@@ -322,7 +306,13 @@ export default function Home() {
   };
 
   const handleDisplayResult = async (newQuestion: string) => {
+    const validationError = validateResearchSettings(chatBoxSettings);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
     // Exit chat mode when starting a new research
+    setIsStopped(false);
     setIsInChatMode(false);
     setShowResult(true);
     setLoading(true);
@@ -332,228 +322,11 @@ export default function Home() {
     setCurrentResearchId(null); // Reset current research ID for new research
     setOrderedData((prevOrder) => [...prevOrder, { type: 'question', content: newQuestion }]);
 
-    // For mobile, use a simplified approach without websockets
-    if (isMobile) {
-      try {
-        // Create a new unique ID for this research
-        const newResearchId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        
-        // First save the initial question to history - with proper parameters
-        const initialOrderedData: Data[] = [{ type: 'question', content: newQuestion } as QuestionData];
-        await saveResearch(
-          newQuestion,  // question
-          '',           // empty answer initially
-          initialOrderedData  // ordered data
-        );
-        
-        // Make direct API call to get response
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content: newQuestion }],
-            // No report since this is a new research
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.response && data.response.content) {
-          // Add the AI response to the ordered data
-          const chatData: ChatData = { 
-            type: 'chat', 
-            content: data.response.content,
-            metadata: data.response.metadata 
-          };
-          
-          // Set the answer
-          const chatAnswer = data.response.content;
-          setAnswer(chatAnswer);
-          setOrderedData(prevOrder => [...prevOrder, chatData]);
-          
-          // Update the research with the answer
-          const updatedOrderedData: Data[] = [
-            { type: 'question', content: newQuestion } as QuestionData,
-            chatData
-          ];
-          
-          // Save the completed research with proper parameters
-          await updateResearch(
-            newResearchId,    // id
-            chatAnswer,       // answer
-            updatedOrderedData // ordered data
-          );
-          
-          // Set current research ID so we can continue the conversation
-          setCurrentResearchId(newResearchId);
-        } else {
-          // Handle error
-          setOrderedData(prevOrder => [...prevOrder, { 
-            type: 'chat', 
-            content: 'Sorry, I couldn\'t generate a research response. Please try again.' 
-          } as ChatData]);
-        }
-      } catch (error) {
-        console.error('Error in mobile research:', error);
-        // Show error message
-        setOrderedData(prevOrder => [...prevOrder, { 
-          type: 'chat', 
-          content: 'Sorry, there was an error processing your request. Please try again.' 
-        } as ChatData]);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    const storedConfig = localStorage.getItem('apiVariables');
-    const apiVariables = storedConfig ? JSON.parse(storedConfig) : {};
-    const langgraphHostUrl = apiVariables.LANGGRAPH_HOST_URL;
-
-    // Starting new research - tracking for redirection once complete
-    const newResearchStarted = Date.now().toString();
-    // We'll use this as a temporary ID to keep track of this research
-    const tempResearchId = `temp-${newResearchStarted}`;
-
-    if (chatBoxSettings.report_type === 'multi_agents' && langgraphHostUrl) {
-      let { streamResponse, host, thread_id } = await startLanggraphResearch(newQuestion, chatBoxSettings.report_source, langgraphHostUrl);
-      const langsmithGuiLink = `https://smith.langchain.com/studio/thread/${thread_id}?baseUrl=${host}`;
-      setOrderedData((prevOrder) => [...prevOrder, { type: 'langgraphButton', link: langsmithGuiLink }]);
-
-      let previousChunk = null;
-      for await (const chunk of streamResponse) {
-        if (chunk.data.report != null && chunk.data.report != "Full report content here") {
-          setOrderedData((prevOrder) => [...prevOrder, { ...chunk.data, output: chunk.data.report, type: 'report' }]);
-          setLoading(false);
-        
-          // Save research and navigate to its unique URL once it's complete
-          setAnswer(chunk.data.report);
-        } else if (previousChunk) {
-          const differences = findDifferences(previousChunk, chunk);
-          setOrderedData((prevOrder) => [...prevOrder, { type: 'differences', content: 'differences', output: JSON.stringify(differences) }]);
-        }
-        previousChunk = chunk;
-      }
-    } else {
-      initializeWebSocket(newQuestion, chatBoxSettings);
-    }
+    initializeWebSocket(newQuestion, { ...chatBoxSettings, report_type: "multi_agents" });
   };
 
-  // Mobile-specific implementation for research
-  const handleMobileDisplayResult = async (newQuestion: string) => {
-    // Update UI state
-    setIsInChatMode(false);
-    setShowResult(true);
-    setLoading(true);
-    setQuestion(newQuestion);
-    setPromptValue("");
-    setAnswer("");
-    setCurrentResearchId(null);
-    
-    // Start with just the question
-    setOrderedData([{ type: 'question', content: newQuestion } as QuestionData]);
-    
-    try {
-      // Generate unique ID for this research
-      const mobileResearchId = `mobile-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      
-      // Save initial research with just the question
-      const initialOrderedData: Data[] = [{ type: 'question', content: newQuestion } as QuestionData];
-      
-      // Save to research history
-      await saveResearch(
-        newQuestion,  // question
-        '',           // empty answer initially
-        initialOrderedData  // ordered data
-      );
-      
-      // Make direct API call instead of using websockets
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: newQuestion }],
-          // Include the required parameters
-          report: '',  // No report since this is a new research
-          report_source: chatBoxSettings.report_source || 'web',
-          tone: chatBoxSettings.tone || 'Objective'
-        }),
-        // Set reasonable timeout
-        signal: AbortSignal.timeout(30000) // 30-second timeout
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.response && data.response.content) {
-        // Extract the response
-        const responseContent = data.response.content;
-        
-        // Update UI with the answer
-        setAnswer(responseContent);
-        
-        // Create chat data object
-        const chatData: ChatData = { 
-          type: 'chat', 
-          content: responseContent,
-          metadata: data.response.metadata 
-        };
-        
-        // Update ordered data to include the response
-        setOrderedData(prevData => [...prevData, chatData]);
-        
-        // Update the complete research
-        const updatedOrderedData: Data[] = [
-          { type: 'question', content: newQuestion } as QuestionData,
-          chatData
-        ];
-        
-        // Update research history with the answer
-        await updateResearch(
-          mobileResearchId,
-          responseContent,
-          updatedOrderedData
-        );
-        
-        // Set current research ID for future interactions
-        setCurrentResearchId(mobileResearchId);
-      } else {
-        // Handle error in response
-        setOrderedData(prevData => [
-          ...prevData, 
-          { 
-            type: 'chat', 
-            content: "I'm sorry, I couldn't generate a complete response. Please try rephrasing your question." 
-          } as ChatData
-        ]);
-      }
-    } catch (error) {
-      console.error('Mobile research error:', error);
-      
-      // Show error in UI
-      setOrderedData(prevData => [
-        ...prevData, 
-        { 
-          type: 'chat', 
-          content: "Sorry, there was an error processing your request. Please try again." 
-        } as ChatData
-      ]);
-    } finally {
-      // Always finish loading state
-      setLoading(false);
-    }
-  };
+  // All device sizes use the same research workflow and selected documents.
+  const handleMobileDisplayResult = handleDisplayResult;
 
   // Mobile-specific chat handler
   const handleMobileChat = async (message: string) => {
@@ -636,7 +409,7 @@ export default function Home() {
         // Show error message
         setOrderedData(prevOrder => [...prevOrder, { 
           type: 'chat', 
-          content: 'Sorry, something went wrong. Please try again.' 
+          content: '抱歉，出现了问题，请重试。'
         } as ChatData]);
       }
     } catch (error) {
@@ -645,7 +418,7 @@ export default function Home() {
       // Add error message
       setOrderedData(prevOrder => [...prevOrder, { 
         type: 'chat', 
-        content: 'Sorry, there was an error processing your request. Please try again.' 
+        content: '抱歉，处理你的请求时发生错误，请重试。'
       } as ChatData]);
     } finally {
       setIsProcessingChat(false);
@@ -673,9 +446,7 @@ export default function Home() {
     setQuestionForHuman(false);
     
     // Clean up connections
-    if (socket) {
-      socket.close();
-    }
+    closeConnection();
     setLoading(false);
   };
 
@@ -693,17 +464,13 @@ export default function Home() {
    * - Stops loading state
    * - Marks research as stopped
    * - Preserves current results
-   * - Reloads the page to fully reset the connection
    */
   const handleStopResearch = () => {
-    if (socket) {
-      socket.close();
-    }
+    closeConnection();
     setLoading(false);
     setIsStopped(true);
     
-    // Reload the page to completely reset the socket connection
-    window.location.reload();
+    setShowHumanFeedback(false);
   };
 
   /**
@@ -723,15 +490,16 @@ export default function Home() {
     const url = `${window.location.origin}/research/${currentResearchId}`;
     navigator.clipboard.writeText(url)
       .then(() => {
-        toast.success("URL copied to clipboard!");
+        toast.success("链接已复制到剪贴板！");
       })
       .catch(() => {
-        toast.error("Failed to copy URL");
+        toast.error("复制链接失败");
       });
   };
 
   // Add a ref to track if an update is in progress to prevent infinite loops
   const isUpdatingRef = useRef(false);
+  const lastSyncedResearchIdRef = useRef<string | null>(null);
 
   // Save or update research in history based on mode
   useEffect(() => {
@@ -740,7 +508,7 @@ export default function Home() {
       // Prevent infinite loops by checking if we're already updating
       if (isUpdatingRef.current) return;
       
-      if (showResult && !loading && answer && question && orderedData.length > 0) {
+      if (showResult && !loading && !isStopped && answer && question && orderedData.length > 0) {
         if (isInChatMode && currentResearchId) {
           // Prevent redundant updates by checking if data has changed
           try {
@@ -756,6 +524,11 @@ export default function Home() {
           } catch (error) {
             console.error('Error updating research:', error);
             isUpdatingRef.current = false;
+          }
+        } else if (!isInChatMode && currentResearchId) {
+          if (lastSyncedResearchIdRef.current !== currentResearchId) {
+            lastSyncedResearchIdRef.current = currentResearchId;
+            await refreshHistory();
           }
         } else if (!isInChatMode) {
           // Check if this is a new research (not loaded from history)
@@ -787,7 +560,7 @@ export default function Home() {
     
     // Call the async function
     saveOrUpdateResearch();
-  }, [showResult, loading, answer, question, orderedData, history, saveResearch, updateResearch, isInChatMode, currentResearchId, getResearchById]);
+  }, [showResult, loading, isStopped, answer, question, orderedData, history, saveResearch, updateResearch, isInChatMode, currentResearchId, getResearchById, refreshHistory]);
 
   // Handle selecting a research from history
   const handleSelectResearch = async (id: string) => {
@@ -799,7 +572,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error selecting research:', error);
-      toast.error('Could not load the selected research');
+      toast.error('无法加载所选研究');
     }
   };
 
@@ -814,7 +587,7 @@ export default function Home() {
    */
   useEffect(() => {
     const groupedData = preprocessOrderedData(orderedData);
-    const statusReports = ["agent_generated", "starting_research", "planning_research", "error"];
+    const statusReports = ["agent_generated", "starting_research", "planning_research", "error", "evidence_retrieval", "citation_warning"];
     
     const newLogs = groupedData.reduce((acc: any[], data) => {
       // Process accordion blocks (grouped data)
@@ -842,17 +615,17 @@ export default function Home() {
     setAllLogs(newLogs);
   }, [orderedData]);
 
-  // Save chatBoxSettings to localStorage when they change
+  // Layout is a UI preference; research settings are deliberately not persisted.
   useEffect(() => {
-    localStorage.setItem('chatBoxSettings', JSON.stringify(chatBoxSettings));
-  }, [chatBoxSettings]);
+    localStorage.setItem('gptrUiLayout', chatBoxSettings.layoutType || 'copilot');
+  }, [chatBoxSettings.layoutType]);
 
   // Set chat mode when a report is complete
   useEffect(() => {
-    if (showResult && !loading && answer && !isInChatMode) {
+    if (showResult && !loading && !isStopped && answer && !isInChatMode) {
       setIsInChatMode(true);
     }
-  }, [showResult, loading, answer, isInChatMode]);
+  }, [showResult, loading, isStopped, answer, isInChatMode]);
 
   // Update the renderMobileContent function to use both mobile-specific functions
   const renderMobileContent = () => {
@@ -929,6 +702,8 @@ export default function Home() {
                 promptValue={promptValue}
                 setPromptValue={setPromptValue}
                 handleDisplayResult={handleDisplayResult}
+                chatBoxSettings={chatBoxSettings}
+                setChatBoxSettings={setChatBoxSettings}
               />
             </>
           )
@@ -976,6 +751,7 @@ export default function Home() {
                   isProcessingChat={isProcessingChat}
                   onNewResearch={handleStartNewResearch}
                   toggleSidebar={toggleSidebar}
+                  onStop={handleStopResearch}
                 />
               ) : (
                 <ResearchContent
@@ -1001,7 +777,7 @@ export default function Home() {
                 />
               )}
               
-              {showHumanFeedback && false && (
+              {showHumanFeedback && (
                 <HumanFeedback
                   questionForHuman={questionForHuman}
                   websocket={socket}

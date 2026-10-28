@@ -58,7 +58,7 @@ export default function ImagesAlbum({ images }: ImagesAlbumProps) {
                     >
                         <img
                             src={image}
-                            alt={`Image ${index + 1}`}
+                            alt={`图片 ${index + 1}`}
                             className="absolute inset-0 w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity duration-300"
                             onClick={() => openModal(image, index)}
                             onError={() => handleImageError(image)}

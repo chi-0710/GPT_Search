@@ -1,22 +1,22 @@
-# GPT-Researcher Evaluations
+# ResearchRunner Evaluations
 
-This directory contains evaluation tools and frameworks for assessing the performance of GPT-Researcher across different research tasks.
+This directory contains evaluation tools and frameworks for assessing the performance of ResearchRunner across different research tasks.
 
 ## Simple Evaluations (`simple_evals/`)
 
-The `simple_evals` directory contains a straightforward evaluation framework adapted from [OpenAI's simple-evals system](https://github.com/openai/simple-evals), specifically designed to measure short-form factuality in large language models. Our implementation is based on OpenAI's [SimpleQA evaluation methodology](https://github.com/openai/simple-evals/blob/main/simpleqa_eval.py), following their zero-shot, chain-of-thought approach while adapting it for GPT-Researcher's specific use case.
+The `simple_evals` directory contains a straightforward evaluation framework adapted from [OpenAI's simple-evals system](https://github.com/openai/simple-evals), specifically designed to measure short-form factuality in large language models. Our implementation is based on OpenAI's [SimpleQA evaluation methodology](https://github.com/openai/simple-evals/blob/main/simpleqa_eval.py), following their zero-shot, chain-of-thought approach while adapting it for ResearchRunner's specific use case.
 
 ### Components
 
 - `simpleqa_eval.py`: Core evaluation logic for grading research responses
-- `run_eval.py`: Script to execute evaluations against GPT-Researcher
+- `run_eval.py`: Script to execute evaluations against ResearchRunner
 - `requirements.txt`: Dependencies required for running evaluations
 
 ### Test Dataset
 
 The `problems/` directory contains the evaluation dataset:
 
-- `Simple QA Test Set.csv`: A comprehensive collection of factual questions and their correct answers, mirrored from OpenAI's original test set. This dataset serves as the ground truth for evaluating GPT-Researcher's ability to find and report accurate information. The file is maintained locally to ensure consistent evaluation benchmarks and prevent any potential upstream changes from affecting our testing methodology.
+- `Simple QA Test Set.csv`: A comprehensive collection of factual questions and their correct answers, mirrored from OpenAI's original test set. This dataset serves as the ground truth for evaluating ResearchRunner's ability to find and report accurate information. The file is maintained locally to ensure consistent evaluation benchmarks and prevent any potential upstream changes from affecting our testing methodology.
 
 ### Evaluation Logs
 
@@ -85,10 +85,10 @@ The `num_examples` parameter determines how many random test queries to evaluate
 
 #### Customizing Researcher Behavior
 
-The evaluation uses GPTResearcher with default settings, but you can modify `run_eval.py` to customize the researcher's behavior:
+The evaluation uses Research with default settings, but you can modify `run_eval.py` to customize the researcher's behavior:
 
 ```python
-researcher = GPTResearcher(
+researcher = Research(
     query=query,
     report_type=ReportType.ResearchReport.value,  # Type of report to generate
     report_format="markdown",                      # Output format
@@ -156,11 +156,11 @@ results             → per-query list with grade, score, latency, cost, sources
 
 ## Hallucination Evaluation (`hallucination_eval/`)
 
-The `hallucination_eval` directory contains tools for evaluating GPT-Researcher's outputs for hallucination. This evaluation system compares the generated research reports against their source materials to detect non-factual or hallucinated content, ensuring the reliability and accuracy of the research outputs.
+The `hallucination_eval` directory contains tools for evaluating ResearchRunner's outputs for hallucination. This evaluation system compares the generated research reports against their source materials to detect non-factual or hallucinated content, ensuring the reliability and accuracy of the research outputs.
 
 ### Components
 
-- `run_eval.py`: Script to execute evaluations against GPT-Researcher
+- `run_eval.py`: Script to execute evaluations against ResearchRunner
 - `evaluate.py`: Core evaluation logic for detecting hallucinations
 - `inputs/`: Directory containing test queries
   - `search_queries.jsonl`: Collection of research queries for evaluation

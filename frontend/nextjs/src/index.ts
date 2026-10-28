@@ -1,5 +1,5 @@
 // src/index.ts
-import { GPTResearcher } from './GPTResearcher';
+import { Research } from './Research';
 
-export { GPTResearcher };
-export type { GPTResearcherProps } from './GPTResearcher';
+export { Research };
+export type { ResearchProps } from './Research';

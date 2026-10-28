@@ -73,7 +73,7 @@ export default function ImageModal({ imageSrc, isOpen, onClose, onNext, onPrev }
                 </button>
                 <img
                     src={imageSrc}
-                    alt="Modal view"
+                    alt="图片预览"
                     className="max-h-[90vh] max-w-[90vw] object-contain"
                 />
                 <button

@@ -1,8 +1,3 @@
-from .utils.file_formats import \
-    write_md_to_pdf, \
-    write_md_to_word, \
-    write_text_to_md
-
 from .utils.views import print_agent_output
 
 
@@ -13,12 +8,6 @@ class PublisherAgent:
         self.output_dir = output_dir.strip()
         self.headers = headers or {}
         
-    async def publish_research_report(self, research_state: dict, publish_formats: dict):
-        layout = self.generate_layout(research_state)
-        await self.write_report_by_formats(layout, publish_formats)
-
-        return layout
-
     def generate_layout(self, research_state: dict):
         sections = []
         for subheader in research_state.get("research_data", []):
@@ -37,7 +26,7 @@ class PublisherAgent:
         diagrams_text = ""
         diagrams = research_state.get("diagrams", [])
         if diagrams:
-            diagrams_text = "\n## Visualizations\n" + "\n\n".join(diagrams) + "\n"
+            diagrams_text = "\n## 可视化\n" + "\n\n".join(diagrams) + "\n"
 
         layout = f"""# {headers.get('title')}
 #### {headers.get("date")}: {research_state.get('date')}
@@ -58,20 +47,11 @@ class PublisherAgent:
 """
         return layout
 
-    async def write_report_by_formats(self, layout:str, publish_formats: dict):
-        if publish_formats.get("pdf"):
-            await write_md_to_pdf(layout, self.output_dir)
-        if publish_formats.get("docx"):
-            await write_md_to_word(layout, self.output_dir)
-        if publish_formats.get("markdown"):
-            await write_text_to_md(layout, self.output_dir)
-
     async def run(self, research_state: dict):
-        task = research_state.get("task")
-        publish_formats = task.get("publish_formats")
+        """Assemble Markdown; the application/CLI owns persisted exports."""
         if self.websocket and self.stream_output:
-            await self.stream_output("logs", "publishing", f"Publishing final research report based on retrieved data...", self.websocket)
+            await self.stream_output("logs", "publishing", f"正在根据检索到的资料发布最终研究报告...", self.websocket)
         else:
             print_agent_output(output="Publishing final research report based on retrieved data...", agent="PUBLISHER")
-        final_research_report = await self.publish_research_report(research_state, publish_formats)
+        final_research_report = self.generate_layout(research_state)
         return {"report": final_research_report}

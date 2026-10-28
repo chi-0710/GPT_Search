@@ -62,6 +62,11 @@ public class ResourceController {
         String original = "<p>原文件已删除，以下引用片段仍可查看。</p>";
         if (type.equals("mcp")) {
             original = "<p>工具检索结果：以下为本次研究使用的内容快照。</p>";
+        } else if (item.path("document_id").asText("").isBlank()
+                && item.path("url").asText("").matches("^https?://\\S+$")) {
+            String remote = escape(item.path("url").asText());
+            original = "<p><a href=\"" + remote + "\" rel=\"noopener noreferrer\">打开原始文档</a></p>"
+                    + "<p>该文档来自远程 URL，未保存原文件。</p>";
         } else if (item.path("original_available").asBoolean()) {
             String path = "/api/documents/" + encoded(item.path("document_id").asText()) + "/content";
             original = "<p><a href=\"" + path + "\">下载原文件</a></p>";

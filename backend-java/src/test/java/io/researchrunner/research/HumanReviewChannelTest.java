@@ -29,4 +29,22 @@ class HumanReviewChannelTest {
             assertInstanceOf(CancellationException.class,error.getCause());
         }
     }
+
+    @Test void pythonSentinelAnswersAcceptThePlan() {
+        for(String answer:List.of("no","NO","无","没有","没有反馈","不需要","无需修改")) {
+            assertTrue(HumanReviewChannel.noFeedback(" "+answer+" "),answer);
+        }
+        assertFalse(HumanReviewChannel.noFeedback("not enough evidence"));
+        assertFalse(HumanReviewChannel.noFeedback(""));
+    }
+
+    @Test void legacyFeedbackWithoutIdentifiersBindsToCurrentReview() throws Exception {
+        UUID run=UUID.randomUUID();var entered=new LinkedBlockingQueue<HumanReviewChannel.Request>();
+        try(var pool=Executors.newVirtualThreadPerTaskExecutor();var channel=new HumanReviewChannel(run,entered::add,Duration.ofSeconds(3))) {
+            var result=pool.submit(()->channel.review("标题",List.of("章节"),0));
+            assertNotNull(entered.poll(2,TimeUnit.SECONDS));
+            assertTrue(channel.submitCurrent("无"));
+            assertTrue(result.get(2,TimeUnit.SECONDS).accepted());
+        }
+    }
 }

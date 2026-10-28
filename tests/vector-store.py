@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 from typing import List
-from gpt_researcher import GPTResearcher
+from search import Research
 
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
@@ -124,8 +124,8 @@ async def test_gpt_researcher_with_vector_store():
     """
 
 
-    # Create an instance of GPTResearcher
-    researcher = GPTResearcher(
+    # Create an instance of Research
+    researcher = Research(
         query=query,
         report_type="research_report",
         report_source="langchain_vectorstore",
@@ -143,7 +143,7 @@ async def test_store_in_vector_store_web():
     vector_store = InMemoryVectorStore(embedding=OpenAIEmbeddings())
     query = "Which one is the best LLM"
 
-    researcher = GPTResearcher(
+    researcher = Research(
         query=query,
         report_type="research_report",
         report_source="web",
@@ -163,7 +163,7 @@ async def test_store_in_vector_store_urls():
     vector_store = InMemoryVectorStore(embedding=OpenAIEmbeddings())
     query = "Who won the world cup in 2022"
 
-    researcher = GPTResearcher(
+    researcher = Research(
         query=query,
         report_type="research_report",
         vector_store=vector_store,
@@ -183,7 +183,7 @@ async def test_store_in_vector_store_langchain_docs():
     docs = load_document()
     query = "What does successful people tend to do?"
 
-    researcher = GPTResearcher(
+    researcher = Research(
         query=query,
         report_type="research_report",
         vector_store=vector_store,
@@ -202,7 +202,7 @@ async def test_store_in_vector_store_locals():
     vector_store = InMemoryVectorStore(embedding=OpenAIEmbeddings())
     query = "What is transformer?"
 
-    researcher = GPTResearcher(
+    researcher = Research(
         query=query,
         report_type="research_report",
         vector_store=vector_store,
@@ -221,7 +221,7 @@ async def test_store_in_vector_store_hybrids():
     vector_store = InMemoryVectorStore(embedding=OpenAIEmbeddings())
     query = "What is transformer?"
     
-    researcher = GPTResearcher(
+    researcher = Research(
         query=query,
         report_type="research_report",
         vector_store=vector_store,

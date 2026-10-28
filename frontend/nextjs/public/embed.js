@@ -1,7 +1,8 @@
 (function () {
-    window.GPTResearcher = {
+    window.Research = {
         init: function () {
-            const parentApiUrl = localStorage.getItem("GPTR_API_URL");
+            const currentScript = document.currentScript;
+            const parentApiUrl = currentScript && currentScript.getAttribute("data-api-url");
 
             // Create container
             const container = document.createElement("div");
@@ -12,7 +13,7 @@
 
             // Create iframe
             const iframe = document.createElement("iframe");
-            iframe.src = "https://gptr.app" + (parentApiUrl ? "?GPTR_API_URL=" + parentApiUrl : "");
+            iframe.src = "https://gptr.app" + (parentApiUrl ? "?GPTR_API_URL=" + encodeURIComponent(parentApiUrl) : "");
             iframe.style.width = "100%";
             iframe.style.border = "none";
             iframe.style.height = "100%";
@@ -40,7 +41,7 @@
 
             // Add iframe to container
             container.appendChild(iframe);
-            document.currentScript.parentNode.insertBefore(container, document.currentScript);
+            currentScript.parentNode.insertBefore(container, currentScript);
 
             // Handle resize
             window.addEventListener("resize", () => {
@@ -64,5 +65,5 @@
     };
 
     // Initialize when script loads
-    window.GPTResearcher.init();
+    window.Research.init();
 })();

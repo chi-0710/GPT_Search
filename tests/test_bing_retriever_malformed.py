@@ -10,11 +10,11 @@ import os
 import pathlib
 from unittest.mock import patch
 
-# Import the module directly to avoid importing the heavy gpt_researcher package
+# Import the module directly to avoid importing the heavy search package
 # (which pulls optional deps like json_repair at import time).
 _BING_PATH = (
     pathlib.Path(__file__).resolve().parent.parent
-    / "gpt_researcher" / "retrievers" / "bing" / "bing.py"
+    / "search" / "retrievers" / "bing" / "bing.py"
 )
 _spec = importlib.util.spec_from_file_location("_bing_under_test", _BING_PATH)
 _bing = importlib.util.module_from_spec(_spec)

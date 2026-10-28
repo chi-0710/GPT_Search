@@ -9,11 +9,11 @@ import os
 import pathlib
 from unittest.mock import patch
 
-# Import the module directly to avoid importing the heavy gpt_researcher package
+# Import the module directly to avoid importing the heavy search package
 # (which pulls optional deps at import time).
 _SERPAPI_PATH = (
     pathlib.Path(__file__).resolve().parent.parent
-    / "gpt_researcher" / "retrievers" / "serpapi" / "serpapi.py"
+    / "search" / "retrievers" / "serpapi" / "serpapi.py"
 )
 _spec = importlib.util.spec_from_file_location("_serpapi_under_test", _SERPAPI_PATH)
 _serpapi = importlib.util.module_from_spec(_spec)

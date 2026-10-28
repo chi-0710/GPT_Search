@@ -47,6 +47,16 @@ class SourceCollectorTest {
         assertThrows(InterruptedException.class,()->collector.collect("query",1000,1000));
     }
 
+    @Test void exposesFrozenSelectionAndSourceForPromptBranching() {
+        UUID id=UUID.randomUUID();
+        var selection=select("local",List.of(id));
+        var collector=new SourceCollector(selection,(q,ids)->List.of(document(id)),(q,d,n)->List.of(),(u,d)->null,
+                new EvidenceRegistry(UUID.randomUUID()));
+        assertSame(selection,collector.selection(),"selection 必须是只读的冻结选择");
+        assertEquals("local",collector.source());
+        assertEquals("web",select("web",List.of()).source());
+    }
+
     @Test void sharedRegistryRetainsIdsAcrossInitialAndChapterResearch() throws Exception {
         UUID id=UUID.randomUUID();var registry=new EvidenceRegistry(UUID.randomUUID());
         var collector=new SourceCollector(select("local",List.of(id)),(q,ids)->List.of(document(id)),(q,d,n)->List.of(),(u,d)->null,registry);

@@ -1,6 +1,3 @@
-import json
-
-
 class HumanAgent:
     def __init__(self, websocket=None, stream_output=None, headers=None):
         self.websocket = websocket
@@ -22,29 +19,28 @@ class HumanAgent:
                     await self.stream_output(
                         "human_feedback",
                         "request",
-                        f"Any feedback on this plan of topics to research? {layout}? If not, please reply with 'no'.",
+                        f"你对以下研究主题规划有什么修改意见吗？{layout}。如果没有，请回复“无”。",
                         self.websocket,
                     )
-                    # because websocket is wrapped inside a CustomLogsHandler in websocket_manager
-                    response = await self.websocket.websocket.receive_text()
-                    print(f"Received response: {response}", flush=True)
-                    response_data = json.loads(response)
-                    if response_data.get("type") == "human_feedback":
-                        user_feedback = response_data.get("content")
-                    else:
-                        print(
-                            f"Unexpected response type: {response_data.get('type')}",
-                            flush=True,
-                        )
+                    # Feedback is read by the server's single WebSocket receive loop
+                    # and forwarded here to avoid concurrent receive_text() calls.
+                    raw_websocket = self.websocket.websocket
+                    feedback_queue = getattr(raw_websocket.state, "human_feedback_queue", None)
+                    if feedback_queue is None:
+                        raise RuntimeError("Human feedback queue is not initialized")
+                    user_feedback = await feedback_queue.get()
                 except Exception as e:
-                    print(f"Error receiving human feedback: {e}", flush=True)
+                    raise RuntimeError("无法读取人工审核意见，请通过有效的 WebSocket 会话重试") from e
             # Otherwise, prompt the user for feedback in the console
             else:
                 user_feedback = input(
-                    f"Any feedback on this plan? {layout}? If not, please reply with 'no'.\n>> "
+                    f"你对以下规划有什么修改意见吗？{layout}。如果没有，请回复“无”。\n>> "
                 )
 
-        if user_feedback and "no" in user_feedback.strip().lower():
+        no_feedback_responses = {
+            "no", "无", "没有", "没有反馈", "不需要", "无需修改"
+        }
+        if user_feedback and user_feedback.strip().lower() in no_feedback_responses:
             user_feedback = None
 
         plan_revision_count = research_state.get("plan_revision_count", 0)

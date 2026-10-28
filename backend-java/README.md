@@ -4,7 +4,6 @@
 
 ## 全 Java 迁移进展
 
-完整范围、约束与未完成项见 [MIGRATION_CHECKLIST.md](MIGRATION_CHECKLIST.md)。
 新增 Spring AI 1.1.8、LangGraph4j Core 1.9.7，保留 Boot 3.5.7；使用本项目的模型边界对接，
 不引入面向 Spring AI 2.x 的 LangGraph4j Spring AI 集成模块。
 研究图拓扑和实际节点动作已实现并经过编译执行测试，HTTP/WebSocket 入口及最终部署尚未接通。

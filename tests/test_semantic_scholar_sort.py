@@ -7,7 +7,7 @@ incoming value is one of them. It then stored ``sort.lower()``, corrupting
 query parameter. The Semantic Scholar API expects the camelCase form.
 """
 
-from gpt_researcher.retrievers.semantic_scholar.semantic_scholar import (
+from search.retrievers.semantic_scholar.semantic_scholar import (
     SemanticScholarSearch,
 )
 

@@ -27,7 +27,22 @@ public final class CompatibleModelFactory {
         Map.entry("forge", new Endpoint("https://api.forge.tensorblock.co/v1", "FORGE_API_KEY", null)),
         Map.entry("avian", new Endpoint("https://api.avian.io/v1", "AVIAN_API_KEY", null)),
         Map.entry("minimax", new Endpoint("https://api.minimax.io/v1", "MINIMAX_API_KEY", null)),
-        Map.entry("nebius", new Endpoint("https://api.tokenfactory.nebius.com/v1", "NEBIUS_API_KEY", "NEBIUS_BASE_URL"))
+        Map.entry("nebius", new Endpoint("https://api.tokenfactory.nebius.com/v1", "NEBIUS_API_KEY", "NEBIUS_BASE_URL")),
+        Map.entry("ollama", new Endpoint("http://localhost:11434/v1", "OLLAMA_API_KEY", "OLLAMA_BASE_URL")),
+        Map.entry("groq", new Endpoint("https://api.groq.com/openai/v1", "GROQ_API_KEY", "GROQ_BASE_URL")),
+        Map.entry("mistralai", new Endpoint("https://api.mistral.ai/v1", "MISTRAL_API_KEY", "MISTRAL_BASE_URL")),
+        Map.entry("xai", new Endpoint("https://api.x.ai/v1", "XAI_API_KEY", "XAI_BASE_URL")),
+        Map.entry("google_genai", new Endpoint("https://generativelanguage.googleapis.com/v1beta/openai",
+                "GOOGLE_API_KEY", "GOOGLE_GENAI_BASE_URL")),
+        Map.entry("fireworks", new Endpoint("https://api.fireworks.ai/inference/v1",
+                "FIREWORKS_API_KEY", "FIREWORKS_BASE_URL")),
+        Map.entry("together", new Endpoint("https://api.together.xyz/v1",
+                "TOGETHER_API_KEY", "TOGETHER_BASE_URL")),
+        Map.entry("litellm", new Endpoint(null, "LITELLM_API_KEY", "LITELLM_BASE_URL")),
+        Map.entry("netmind", new Endpoint("https://api.netmind.ai/inference-api/openai/v1",
+                "NETMIND_API_KEY", "NETMIND_BASE_URL")),
+        Map.entry("huggingface", new Endpoint("https://router.huggingface.co/v1",
+                "HUGGINGFACE_API_KEY", "HUGGINGFACE_BASE_URL"))
     );
 
     public record Settings(String provider, String model, URI endpoint, String apiKey, Duration timeout) {

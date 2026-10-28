@@ -1,4 +1,8 @@
+# Build context is backend-java/ only. Keep the local toolchain, Maven cache, build output and
+# acceptance evidence out of the image build. `target-image/` is the single pre-built JAR that
+# Dockerfile.runtime copies, so `target/` itself never needs to be part of the build context.
 target
 .m2
-.git
 .tools
+.git
+acceptance

@@ -91,22 +91,10 @@ public final class DocumentParser {
     /** Code-point-safe chunks with paragraph/line/word boundaries and bounded overlap. */
     public List<Part> split(List<Part> parts, int size, int overlap) {
         if (size < 1 || overlap < 0 || overlap >= size) throw new IllegalArgumentException("分块参数无效");
+        var splitter = new TextSplitter(size, overlap);
         var result = new ArrayList<Part>();
         for (Part part : parts) {
-            int[] points = part.content().codePoints().toArray();
-            int start = 0;
-            while (start < points.length) {
-                int end = Math.min(start + size, points.length);
-                if (end < points.length) {
-                    for (int i = end - 1; i > start + Math.max(overlap, size / 2); i--) {
-                        if (Character.isWhitespace(points[i])) { end = i + 1; break; }
-                    }
-                }
-                String text = new String(points, start, end - start).strip();
-                if (!text.isEmpty()) result.add(new Part(text, part.page()));
-                if (end == points.length) break;
-                start = Math.max(start + 1, end - overlap);
-            }
+            for (String chunk : splitter.split(part.content())) result.add(new Part(chunk, part.page()));
         }
         return result;
     }

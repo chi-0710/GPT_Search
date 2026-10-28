@@ -57,13 +57,48 @@ class ResearchNodesTest {
 
     @Test void unresolvedDraftReviewStopsWithoutPublishing() throws Exception {
         var evidence=new EvidenceRegistry(UUID.randomUUID());var revisions=new AtomicInteger();
+        var reviewerPrompts=Collections.synchronizedList(new ArrayList<String>());
         var nodes=new ResearchNodes(settings(),collector(evidence,false),evidence,(stage,instruction,input)->{
             if(stage.equals("planner"))return "{\"title\":\"标题\",\"sections\":[\"章节\"]}";
-            if(stage.equals("section_reviewer"))return "{\"accepted\":false,\"feedback\":\"缺少论证\"}";
-            if(stage.equals("section_reviser"))revisions.incrementAndGet();return "正文 [E1]";
+            if(stage.equals("section_reviewer")) {
+                reviewerPrompts.add(instruction);
+                return "{\"accepted\":false,\"feedback\":\"缺少论证\"}";
+            }
+            if(stage.equals("section_reviser")) {
+                revisions.incrementAndGet();
+                return "{\"draft\":\"正文 [E1]\",\"revision_notes\":\"已补充论证\"}";
+            }
+            return "正文 [E1]";
         },(t,s,r)->new ResearchNodes.Decision(true,""),r->r,(r,e,w)->fail("must not publish"),(s,m)->{},()->false);
         assertThrows(Exception.class,()->ResearchWorkflow.compile(nodes.actions(),1,1).invoke(GraphInput.noArgs(),RunnableConfig.empty()));
         assertEquals(1,revisions.get());
+        assertEquals(2,reviewerPrompts.size(),"拒绝后必须再复审一次才达到修订上限");
+        assertFalse(reviewerPrompts.get(0).contains("修订者已根据你之前的审阅意见"));
+        assertTrue(reviewerPrompts.get(1).contains("修订者已根据你之前的审阅意见修改了草稿，并提供了以下反馈：\n已补充论证"),
+                "章节修订后的复审必须使用 revision 变体");
+    }
+
+    @Test void webSourceUsesWebReferencePromptBranch() throws Exception {
+        var evidence=new EvidenceRegistry(UUID.randomUUID());
+        var initialPrompts=Collections.synchronizedList(new ArrayList<String>());
+        var selection=new SourceCollector.Selection("web",List.of(),List.of(),List.of(),2);
+        var collector=new SourceCollector(selection,(q,ids)->{fail("web must not retrieve files");return List.of();},
+                (q,d,n)->List.of(new SearchGateway.Hit("https://example.com/a","标题","摘要")),
+                (u,d)->new SearchGateway.Hit(u,"标题","网络完整证据"),evidence);
+        var nodes=new ResearchNodes(settings(),collector,evidence,(stage,instruction,input)->{
+            if(stage.equals("initial_research"))initialPrompts.add(instruction);
+            return switch(stage) {
+                case "planner" -> "{\"title\":\"标题\",\"sections\":[\"章节\"]}";
+                case "section_reviewer","fact_checker" -> "{\"accepted\":true,\"feedback\":\"\"}";
+                default -> "正文 [E1]";
+            };
+        },(t,s,r)->new ResearchNodes.Decision(true,""),r->r,(r,e,w)->{},(s,m)->{},()->false);
+        ResearchWorkflow.compile(nodes.actions(),1,1).invoke(GraphInput.noArgs(),RunnableConfig.empty()).orElseThrow();
+        assertEquals(1,initialPrompts.size());
+        String initial=initialPrompts.get(0);
+        assertTrue(initial.contains("你必须在报告末尾以参考文献形式列出所有使用过的来源 URL"),initial);
+        assertTrue(initial.contains("[网站链接](url)"));
+        assertFalse(initial.contains("来源文档名称"),"web 来源必须使用 initial_research 变体");
     }
 
     @Test void cancellationAtStartPreventsModelsAndPersistence() throws Exception {

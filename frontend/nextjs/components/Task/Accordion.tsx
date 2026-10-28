@@ -1,6 +1,7 @@
 // Accordion.tsx
 import { useState, useEffect } from 'react';
 import { addTargetBlankToLinks } from '../../helpers/markdownHelper';
+import { formatResearchLogValue, getResearchFieldLabel, getResearchLogFields } from '../../utils/researchLogDisplay';
 import '../../styles/markdown.css'; // Import global markdown styles
 
 type ProcessedData = {
@@ -18,8 +19,6 @@ type Log = {
 interface AccordionProps {
   logs: Log[];
 }
-
-const plainTextFields = ['task', 'sections', 'headers', 'sources', 'research_data'];
 
 const Accordion: React.FC<AccordionProps> = ({ logs }) => {
   // State to store processed HTML content
@@ -48,6 +47,7 @@ const Accordion: React.FC<AccordionProps> = ({ logs }) => {
   }, [logs]);
 
   const getLogHeaderText = (log: Log): string => {
+    if (log.header === 'research_layout_content') return '报告结构与内容';
     const regex = /📃 Source: (https?:\/\/[^\s]+)/;
     const match = log.text.match(regex);
     let sourceUrl = '';
@@ -57,26 +57,26 @@ const Accordion: React.FC<AccordionProps> = ({ logs }) => {
     }
 
     return log.header === 'differences'
-      ? 'The following fields on the Langgraph were updated: ' + Object.keys(JSON.parse(log.text).data).join(', ')
-      : `📄 Retrieved relevant content from the source: ${sourceUrl}`;
+      ? 'LangGraph 更新了以下字段：' + Object.keys(getResearchLogFields(log.header, log.text) || {}).map(getResearchFieldLabel).join('、')
+      : `📄 已从该来源检索到相关内容：${sourceUrl}`;
   };
 
   const renderLogContent = (log: Log) => {
-    if (log.header === 'differences' && log.processedData) {
+    if ((log.header === 'differences' || log.header === 'research_layout_content') && log.processedData) {
       return log.processedData.map((data, index) => (
         <div key={index} className="mb-4">
-          <h3 className="font-semibold text-lg text-body-color dark:text-dark-6">{data.field}:</h3>
+          <h3 className="font-semibold text-lg text-body-color dark:text-dark-6">{getResearchFieldLabel(data.field)}：</h3>
           {data.isMarkdown ? (
             <div className="markdown-content" dangerouslySetInnerHTML={{ __html: data.htmlContent as string }} />
           ) : (
-            <p className="text-body-color dark:text-dark-6">
-              {typeof data.htmlContent === 'object' ? JSON.stringify(data.htmlContent) : data.htmlContent}
+            <p className="whitespace-pre-wrap text-body-color dark:text-dark-6">
+              {formatResearchLogValue(data.htmlContent)}
             </p>
           )}
         </div>
       ));
     } else {
-      return <p className="mb-2 text-body-color dark:text-dark-6">{log.text}</p>;
+      return <p className="mb-2 whitespace-pre-wrap text-body-color dark:text-dark-6">{log.text}</p>;
     }
   };
 

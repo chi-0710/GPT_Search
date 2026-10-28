@@ -1,5 +1,5 @@
 """
-Hi! The following test cases are for the new parameter `complement_source_urls` and fix on the functional error with `source_urls` in GPTResearcher class.
+Hi! The following test cases are for the new parameter `complement_source_urls` and fix on the functional error with `source_urls` in Research class.
 
 The source_urls parameter was resetting each time in conduct_research function causing gptr to forget the given links. Now, that has been fixed and a new parameter is introduced.
 This parameter named will `complement_source_urls` allow GPTR to research on sources other than the provided sources via source_urls if set to True. 
@@ -14,7 +14,7 @@ Default is False, i.e., no additional research will be conducted on newer source
 
 #### Test case 1 (original test case as control from https://docs.gptr.dev/docs/gpt-researcher/tailored-research)
 
-from gpt_researcher.agent import GPTResearcher  # Ensure this path is correct
+from search.agent import Research  # Ensure this path is correct
 import asyncio
 import logging
 from typing import List, Dict, Any
@@ -22,7 +22,7 @@ from backend.server.server_utils import CustomLogsHandler  # Update import
 
 async def get_report(query: str, report_type: str, sources: list) -> str:
     custom_logs_handler = CustomLogsHandler(None, query)  # Pass query parameter
-    researcher = GPTResearcher(query=query, 
+    researcher = Research(query=query, 
                                report_type=report_type, 
                                complement_source_urls=False,
                                websocket=custom_logs_handler)
@@ -44,11 +44,11 @@ if __name__ == "__main__":
 
 #### Test case 2 (Illustrating the problem, i.e., source_urls are not scoured. Hence, no relevant context)
 
-# from gpt_researcher.agent import GPTResearcher  # Ensure this path is correct
+# from search.agent import Research  # Ensure this path is correct
 # import asyncio
 
 # async def get_report(query: str, report_type: str, sources: list) -> str:
-#     researcher = GPTResearcher(query=query, report_type=report_type, source_urls=sources)
+#     researcher = Research(query=query, report_type=report_type, source_urls=sources)
 #     await researcher.conduct_research()
 #     report = await researcher.write_report()
 #     return report, researcher
@@ -67,11 +67,11 @@ if __name__ == "__main__":
 
 #### Test case 3 (Suggested solution - complement_source_urls parameter allows GPTR to scour more of the web and not restrict to source_urls)
 
-# from gpt_researcher.agent import GPTResearcher  # Ensure this path is correct
+# from search.agent import Research  # Ensure this path is correct
 # import asyncio
 
 # async def get_report(query: str, report_type: str, sources: list) -> str:
-#     researcher = GPTResearcher(query=query, report_type=report_type, source_urls=sources, complement_source_urls=True)
+#     researcher = Research(query=query, report_type=report_type, source_urls=sources, complement_source_urls=True)
 #     await researcher.conduct_research()
 #     report = await researcher.write_report()
 #     return report, researcher
@@ -90,11 +90,11 @@ if __name__ == "__main__":
 
 # #### Test case 4 (Furthermore, GPTR will create more context in addition to source_urls if the complement_source_urls parameter is set allowing for a larger research scope)
 
-# from gpt_researcher.agent import GPTResearcher  # Ensure this path is correct
+# from search.agent import Research  # Ensure this path is correct
 # import asyncio
 
 # async def get_report(query: str, report_type: str, sources: list) -> str:
-#     researcher = GPTResearcher(query=query, report_type=report_type, source_urls=sources, complement_source_urls=True)
+#     researcher = Research(query=query, report_type=report_type, source_urls=sources, complement_source_urls=True)
 #     await researcher.conduct_research()
 #     report = await researcher.write_report()
 #     return report, researcher

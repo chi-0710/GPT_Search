@@ -31,7 +31,9 @@ public class ResearchPublication {
             artifacts.saveWithId(figure.id(),figure.png(),figure.filename(),"image","image/png",run.researchId(),run.runId(),
                     "outputs/"+figure.filename(),Map.of("generator","java-flowchart"));
         }
-        var paths=exports.save(run.researchId(),run.runId(),result.report(),pdf,docx);
+        var saved=exports.saveWithWarnings(run.researchId(),run.runId(),result.report(),pdf,docx);
+        for(String warning:saved.warnings()) runs.append(run.runId(),Map.of("type","logs","content","warning","output",warning));
+        var paths=saved.paths();
         for(String warning:result.warnings()) runs.append(run.runId(),Map.of("type","logs","content","warning","output",warning));
         runs.append(run.runId(),Map.of("type","report_complete","output",result.report()));
         runs.append(run.runId(),Map.of("type","path","output",paths));

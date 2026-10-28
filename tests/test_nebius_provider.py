@@ -6,11 +6,11 @@ point at the Token Factory endpoint; no network calls are made.
 import os
 import unittest
 
-from gpt_researcher.llm_provider.generic.base import (
+from search.llm_provider.generic.base import (
     GenericLLMProvider,
     _SUPPORTED_PROVIDERS as LLM_PROVIDERS,
 )
-from gpt_researcher.memory.embeddings import (
+from search.memory.embeddings import (
     Memory,
     _SUPPORTED_PROVIDERS as EMBEDDING_PROVIDERS,
 )

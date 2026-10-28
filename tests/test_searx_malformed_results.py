@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "gpt_researcher" / "retrievers" / "searx" / "searx.py"
+MODULE_PATH = ROOT / "search" / "retrievers" / "searx" / "searx.py"
 
 
 def _load():
@@ -26,7 +26,7 @@ def _load():
             sys.modules.pop(key, None)
 
     spec = importlib.util.spec_from_file_location(
-        "gpt_researcher.retrievers.searx.searx_testmod", MODULE_PATH
+        "search.retrievers.searx.searx_testmod", MODULE_PATH
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

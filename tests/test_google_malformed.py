@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from gpt_researcher.retrievers.google.google import GoogleSearch
+from search.retrievers.google.google import GoogleSearch
 
 
 def _searcher():
@@ -30,9 +30,9 @@ def test_google_skips_non_dict_and_missing_link():
     }
     resp = MagicMock(status_code=200, text='{}')
     with patch(
-        "gpt_researcher.retrievers.google.google.requests.get", return_value=resp
+        "search.retrievers.google.google.requests.get", return_value=resp
     ), patch(
-        "gpt_researcher.retrievers.google.google.json.loads", return_value=payload
+        "search.retrievers.google.google.json.loads", return_value=payload
     ):
         out = g.search(max_results=10)
 
@@ -46,8 +46,8 @@ def test_google_returns_empty_list_on_non_dict_json():
     g = _searcher()
     resp = MagicMock(status_code=200, text='[]')
     with patch(
-        "gpt_researcher.retrievers.google.google.requests.get", return_value=resp
+        "search.retrievers.google.google.requests.get", return_value=resp
     ), patch(
-        "gpt_researcher.retrievers.google.google.json.loads", return_value=[]
+        "search.retrievers.google.google.json.loads", return_value=[]
     ):
         assert g.search() == []

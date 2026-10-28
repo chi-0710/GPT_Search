@@ -5,10 +5,10 @@ from .utils.llms import call_model
 
 sample_json = """
 {
-  "table_of_contents": A table of contents in markdown syntax (using '-') based on the research headers and subheaders,
-  "introduction": An indepth introduction to the topic in markdown syntax and hyperlink references to relevant sources,
-  "conclusion": A conclusion to the entire research based on all research data in markdown syntax and hyperlink references to relevant sources,
-  "sources": A list with strings of all used source links in the entire research data in markdown syntax and apa citation format. For example: ['-  Title, year, Author [source url](source)', ...]
+  "table_of_contents": 根据研究标题和子标题生成的 Markdown 目录，使用 '-' 作为列表符号,
+  "introduction": 使用 Markdown 编写的主题引言，保留证据编号引用,
+  "conclusion": 根据研究资料生成的结论，保留证据编号引用,
+  "sources": 以字符串列表列出使用的来源，保留证据编号，例如：['- 来源标题 [E1]', ...]
 }
 """
 
@@ -22,11 +22,11 @@ class WriterAgent:
     def get_headers(self, research_state: dict):
         return {
             "title": research_state.get("title"),
-            "date": "Date",
-            "introduction": "Introduction",
-            "table_of_contents": "Table of Contents",
-            "conclusion": "Conclusion",
-            "references": "References",
+            "date": "日期",
+            "introduction": "引言",
+            "table_of_contents": "目录",
+            "conclusion": "结论",
+            "references": "参考文献",
         }
 
     async def write_sections(self, research_state: dict):
@@ -37,28 +37,25 @@ class WriterAgent:
         guidelines = task.get("guidelines")
 
         fact_notes = research_state.get('fact_check_notes')
-        fact_notes_str = f"Fact Checker Notes: {fact_notes}. You MUST revise the introduction and conclusion to address these issues.\n" if fact_notes else ""
+        fact_notes_str = f"事实核查意见：{fact_notes}。你必须修订引言和结论以解决这些问题。\n" if fact_notes else ""
 
         prompt = [
             {
                 "role": "system",
-                "content": "You are a research writer. Your sole purpose is to write a well-written "
-                "research reports about a "
-                "topic based on research findings and information.\n ",
+                "content": "你是一名研究报告撰写者。你的唯一任务是依据研究发现和资料，"
+                "围绕主题撰写高质量的简体中文研究报告。\n ",
             },
             {
                 "role": "user",
-                "content": f"Today's date is {datetime.now().strftime('%d/%m/%Y')}\n."
-                f"Query or Topic: {query}\n"
-                f"Research data: {str(data)}\n"
+                "content": f"今天的日期是 {datetime.now().strftime('%d/%m/%Y')}。\n"
+                f"问题或主题：{query}\n"
+                f"研究资料：{str(data)}\n"
                 f"{fact_notes_str}"
-                f"Your task is to write an in depth, well written and detailed "
-                f"introduction and conclusion to the research report based on the provided research data. "
-                f"Do not include headers in the results.\n"
-                f"You MUST include any relevant sources to the introduction and conclusion as markdown hyperlinks -"
-                f"For example: 'This is a sample text. ([url website](url))'\n\n"
-                f"{f'You must follow the guidelines provided: {guidelines}' if follow_guidelines else ''}\n"
-                f"You MUST return nothing but a JSON in the following format (without json markdown):\n"
+                f"你的任务是根据所提供的研究资料，为研究报告撰写深入、完整且表述良好的引言和结论。"
+                f"结果中不要包含章节标题。\n"
+                f"引言和结论必须使用简体中文，并保留资料中的 [E编号] 引用，不得编造链接。\n\n"
+                f"{f'你必须遵循以下要求：{guidelines}' if follow_guidelines else ''}\n"
+                f"除以下格式的 JSON 外不要返回任何内容，也不要添加 JSON Markdown 代码块：\n"
                 f"{sample_json}\n\n",
             },
         ]
@@ -74,16 +71,16 @@ class WriterAgent:
         prompt = [
             {
                 "role": "system",
-                "content": """You are a research writer. 
-Your sole purpose is to revise the headers data based on the given guidelines.""",
+                "content": """你是一名研究报告撰写者。
+你的唯一任务是根据给定要求修订标题数据，并确保标题使用简体中文。""",
             },
             {
                 "role": "user",
-                "content": f"""Your task is to revise the given headers JSON based on the guidelines given.
-You are to follow the guidelines but the values should be in simple strings, ignoring all markdown syntax.
-You must return nothing but a JSON in the same format as given in headers data.
-Guidelines: {task.get("guidelines")}\n
-Headers Data: {headers}\n
+                "content": f"""你的任务是根据给定要求修订标题 JSON。
+你必须遵循这些要求，但所有值都应是简单字符串，不使用任何 Markdown 语法，并使用简体中文。
+除与所给标题数据格式完全相同的 JSON 外，不要返回任何内容；必须保留原有 JSON 字段名。
+要求：{task.get("guidelines")}\n
+标题数据：{headers}\n
 """,
             },
         ]
@@ -100,7 +97,7 @@ Headers Data: {headers}\n
             await self.stream_output(
                 "logs",
                 "writing_report",
-                f"Writing final research report based on research data...",
+                f"正在根据研究资料撰写最终研究报告...",
                 self.websocket,
             )
         else:
@@ -131,7 +128,7 @@ Headers Data: {headers}\n
                 await self.stream_output(
                     "logs",
                     "rewriting_layout",
-                    "Rewriting layout based on guidelines...",
+                    '正在根据要求重新编排报告结构...',
                     self.websocket,
                 )
             else:

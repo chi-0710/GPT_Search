@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from gpt_researcher.skills.researcher import ResearchConductor
+from search.skills.researcher import ResearchConductor
 
 
 class TavilySearch:

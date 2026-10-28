@@ -36,4 +36,14 @@ class ApplicationHttpTest {
         assertEquals(422, response.getStatusCode().value());
         verifyNoInteractions(mapper);
     }
+
+    @Test
+    void validationUsesFastApiCompatibleDetailArray() {
+        var response = http.getForEntity("/api/reports?limit=not-a-number", String.class);
+        assertEquals(422, response.getStatusCode().value());
+        String body = response.getBody();
+        assertTrue(body.contains("\"detail\":["), body);
+        assertTrue(body.contains("\"loc\":[\"query\",\"limit\"]"), body);
+        assertTrue(body.contains("\"msg\":"), body);
+    }
 }

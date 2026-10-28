@@ -11,7 +11,7 @@ behavior for the header path (and for a single-retriever value).
 import unittest
 from types import SimpleNamespace
 
-from gpt_researcher.actions.retriever import (
+from search.actions.retriever import (
     get_retrievers,
     get_retriever,
     get_default_retriever,

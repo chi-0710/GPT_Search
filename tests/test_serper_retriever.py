@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from gpt_researcher.retrievers.serper.serper import SerperSearch
+from search.retrievers.serper.serper import SerperSearch
 
 
 def test_skip_items_missing_link(monkeypatch):

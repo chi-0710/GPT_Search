@@ -9,7 +9,7 @@ A greedy ``{.*}`` spans to the last ``}`` and captures the whole object.
 
 import json
 
-from gpt_researcher.actions.agent_creator import extract_json_with_regex
+from search.actions.agent_creator import extract_json_with_regex
 
 
 def test_multi_key_object_not_truncated():

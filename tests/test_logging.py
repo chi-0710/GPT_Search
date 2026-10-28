@@ -1,61 +1,57 @@
-import pytest
 from unittest.mock import AsyncMock
-from fastapi import WebSocket
+
+import pytest
+
 from backend.server.server_utils import CustomLogsHandler
-import os
-import json
+
+
+class FakeEventStore:
+    def __init__(self, timeline):
+        self.timeline = timeline
+
+    async def append_event(self, run_id, payload):
+        self.timeline.append(("database", run_id, payload))
+        return len(self.timeline)
+
 
 @pytest.mark.asyncio
-async def test_custom_logs_handler():
-    # Mock websocket
-    mock_websocket = AsyncMock()
-    mock_websocket.send_json = AsyncMock()
-    
-    # Test initialization
-    handler = CustomLogsHandler(mock_websocket, "test_query")
-    
-    # Verify log file creation
-    assert os.path.exists(handler.log_file)
-    
-    # Test sending log data
-    test_data = {
-        "type": "logs",
-        "message": "Test log message"
-    }
-    
-    await handler.send_json(test_data)
-    
-    # Verify websocket was called with correct data
-    mock_websocket.send_json.assert_called_once_with(test_data)
-    
-    # Verify log file contents
-    with open(handler.log_file, 'r') as f:
-        log_data = json.load(f)
-        assert len(log_data['events']) == 1
-        assert log_data['events'][0]['data'] == test_data 
+async def test_custom_logs_handler_persists_before_websocket_delivery():
+    timeline = []
+    websocket = AsyncMock()
+
+    async def send(payload):
+        timeline.append(("websocket", payload))
+
+    websocket.send_json.side_effect = send
+    handler = CustomLogsHandler(
+        websocket,
+        "test query",
+        store=FakeEventStore(timeline),
+        run_id="run-id",
+        research_id="research-id",
+    )
+    payload = {"type": "logs", "content": "test"}
+
+    await handler.send_json(payload)
+
+    assert timeline == [
+        ("database", "run-id", payload),
+        ("websocket", payload),
+    ]
+
 
 @pytest.mark.asyncio
-async def test_content_update():
-    """Test handling of non-log type data that updates content"""
-    mock_websocket = AsyncMock()
-    mock_websocket.send_json = AsyncMock()
-    
-    handler = CustomLogsHandler(mock_websocket, "test_query")
-    
-    # Test content update
-    content_data = {
-        "query": "test query",
-        "sources": ["source1", "source2"],
-        "report": "test report"
-    }
-    
-    await handler.send_json(content_data)
-    
-    mock_websocket.send_json.assert_called_once_with(content_data)
-    
-    # Verify log file contents
-    with open(handler.log_file, 'r') as f:
-        log_data = json.load(f)
-        assert log_data['content']['query'] == "test query"
-        assert log_data['content']['sources'] == ["source1", "source2"]
-        assert log_data['content']['report'] == "test report"
+async def test_custom_logs_handler_keeps_event_when_delivery_fails():
+    timeline = []
+    websocket = AsyncMock()
+    websocket.send_json.side_effect = RuntimeError("disconnected")
+    handler = CustomLogsHandler(
+        websocket,
+        "test query",
+        store=FakeEventStore(timeline),
+        run_id="run-id",
+    )
+
+    await handler.send_json({"type": "report", "output": "saved"})
+
+    assert timeline[0][0] == "database"

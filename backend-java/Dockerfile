@@ -4,7 +4,9 @@ COPY pom.xml .
 COPY maven-settings.xml .
 RUN mvn -B -ntp -s maven-settings.xml dependency:go-offline
 COPY src src
-RUN mvn -B -ntp -s maven-settings.xml verify
+# Tests run separately (host `scripts/java_build.ps1 test` or the isolated-PG script), so the
+# runtime image build stays deterministic and does not need a database.
+RUN mvn -B -ntp -s maven-settings.xml -DskipTests package
 
 FROM eclipse-temurin:21-jre-jammy AS runtime
 WORKDIR /app

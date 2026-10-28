@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from gpt_researcher.retrievers.crw.crw import CRWRetriever
+from search.retrievers.crw.crw import CRWRetriever
 
 
 def make_response(json_data, status_code=200):
@@ -15,7 +15,7 @@ def make_response(json_data, status_code=200):
 
 class CRWRetrieverTests(unittest.TestCase):
     @patch.dict("os.environ", {"CRW_API_KEY": "test-key"}, clear=False)
-    @patch("gpt_researcher.retrievers.crw.crw.requests.post")
+    @patch("search.retrievers.crw.crw.requests.post")
     def test_search_returns_href_body_shape(self, mock_post):
         mock_post.return_value = make_response(
             {
@@ -39,7 +39,7 @@ class CRWRetrieverTests(unittest.TestCase):
         )
 
     @patch.dict("os.environ", {"CRW_API_KEY": "test-key"}, clear=False)
-    @patch("gpt_researcher.retrievers.crw.crw.requests.post")
+    @patch("search.retrievers.crw.crw.requests.post")
     def test_markdown_preferred_over_description(self, mock_post):
         mock_post.return_value = make_response(
             {
@@ -65,7 +65,7 @@ class CRWRetrieverTests(unittest.TestCase):
         self.assertEqual(results[1]["body"], "only description")
 
     @patch.dict("os.environ", {"CRW_API_KEY": "test-key"}, clear=False)
-    @patch("gpt_researcher.retrievers.crw.crw.requests.post")
+    @patch("search.retrievers.crw.crw.requests.post")
     def test_empty_data_returns_empty_list(self, mock_post):
         mock_post.return_value = make_response({"success": True, "data": []})
 
@@ -92,7 +92,7 @@ class CRWRetrieverTests(unittest.TestCase):
         self.assertEqual(retriever.base_url, "http://localhost:3000")
 
     @patch.dict("os.environ", {"CRW_API_KEY": "test-key"}, clear=False)
-    @patch("gpt_researcher.retrievers.crw.crw.requests.post")
+    @patch("search.retrievers.crw.crw.requests.post")
     def test_envelope_failure_returns_empty_list(self, mock_post):
         mock_post.return_value = make_response(
             {"success": False, "error": "rate limited"}

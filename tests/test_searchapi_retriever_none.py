@@ -5,7 +5,7 @@ Slicing ``None`` raises ``TypeError``, so the retriever must coerce a missing
 or None ``raw_content`` to an empty string.
 """
 
-from gpt_researcher.context.retriever import SearchAPIRetriever
+from search.context.retriever import SearchAPIRetriever
 
 
 def test_none_raw_content_yields_empty_page_content():

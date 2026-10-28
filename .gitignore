@@ -32,7 +32,6 @@ node_modules
 .DS_Store
 .docusaurus
 build
-docs/build
 
 .vscode/launch.json
 .langgraph-data/
@@ -52,3 +51,7 @@ server_log.txt
 .cursorrules
 CURSOR_RULES.md
 /.history
+
+#Ignore local test and report artifacts
+frontend/nextjs/test-results/
+tmp/

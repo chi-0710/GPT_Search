@@ -1,6 +1,6 @@
 """
 SimpleQA: Measuring short-form factuality in large language models
-Adapted for GPT-Researcher from OpenAI's simple-evals
+Adapted for ResearchRunner from OpenAI's simple-evals
 """
 
 import os
@@ -12,84 +12,79 @@ from typing import Dict, List, Any
 from langchain_openai import ChatOpenAI
 
 GRADER_TEMPLATE = """
-Your job is to look at a question, a gold target, and a predicted answer, and then assign a grade of either ["CORRECT", "INCORRECT", "NOT_ATTEMPTED"].
-First, I will give examples of each grade, and then you will grade a new example.
+你的任务是查看一个问题、一个标准答案和一个预测答案，然后从 ["CORRECT", "INCORRECT", "NOT_ATTEMPTED"] 中选择一个等级。
+首先，我会给出每个等级的示例，然后请你为一个新示例评分。
 
-
-The following are examples of CORRECT predicted answers.
+以下是被评为 CORRECT 的预测答案示例。
 ```
-Question: What are the names of Barack Obama's children?
-Gold target: Malia Obama and Sasha Obama
-Predicted answer 1: sasha and malia obama
-Predicted answer 2: most people would say Malia and Sasha, but I'm not sure and would have to double check
-Predicted answer 3: Barack Obama has two daughters. Their names are Malia Ann and Natasha Marian, but they are commonly referred to as Malia Obama and Sasha Obama. Malia was born on July 4, 1998, and Sasha was born on June 10, 2001.
+问题：Barack Obama 的孩子叫什么名字？
+标准答案：Malia Obama 和 Sasha Obama
+预测答案 1：sasha 和 malia obama
+预测答案 2：大多数人会说是 Malia 和 Sasha，但我不确定，需要再次核实
+预测答案 3：Barack Obama 有两个女儿。她们的名字是 Malia Ann 和 Natasha Marian，但通常被称为 Malia Obama 和 Sasha Obama。Malia 出生于 1998 年 7 月 4 日，Sasha 出生于 2001 年 6 月 10 日。
 ```
-These predicted answers are all CORRECT because:
-    - They fully contain the important information in the gold target.
-    - They do not contain any information that contradicts the gold target.
-    - Only semantic meaning matters; capitalization, punctuation, grammar, and order don't matter.
-    - Hedging and guessing are permissible, provided that the gold target is fully included and the response contains no incorrect information or contradictions.
+这些预测答案都属于 CORRECT，原因是：
+    - 它们完整包含了标准答案中的重要信息。
+    - 它们不包含任何与标准答案相矛盾的信息。
+    - 只考虑语义；大小写、标点、语法和顺序不影响评分。
+    - 可以使用保留性表述或猜测，只要完整包含标准答案，且回复中没有错误信息或矛盾。
 
-
-The following are examples of INCORRECT predicted answers.
+以下是被评为 INCORRECT 的预测答案示例。
 ```
-Question: What are the names of Barack Obama's children?
-Gold target: Malia and Sasha
-Predicted answer 1: Malia.
-Predicted answer 2: Malia, Sasha, and Susan.
-Predicted answer 3: Barack Obama does not have any children.
-Predicted answer 4: I think it's either Malia and Sasha. Or it could be Malia and Jackie. Or it could be Joey and Malia.
-Predicted answer 4: While I don't know their exact names, I can tell you that Barack Obama has three children.
-Predicted answer 5: It's possible you may mean Betsy and Olivia. However, you should clarify further details with updated references if necessary. Is that the correct answer?
-Predicted answer 6: It may be the case that Obama's child is named James. However, it's recommended to confirm the most accurate and updated information since this could change over time. This model may not always reflect the most current information.
+问题：Barack Obama 的孩子叫什么名字？
+标准答案：Malia 和 Sasha
+预测答案 1：Malia。
+预测答案 2：Malia、Sasha 和 Susan。
+预测答案 3：Barack Obama 没有孩子。
+预测答案 4：我想可能是 Malia 和 Sasha。也可能是 Malia 和 Jackie。或者是 Joey 和 Malia。
+预测答案 4：虽然我不知道她们的确切名字，但我可以告诉你，Barack Obama 有三个孩子。
+预测答案 5：你可能指的是 Betsy 和 Olivia。不过，如有必要，你应根据最新参考资料进一步澄清细节。这是正确答案吗？
+预测答案 6：Obama 的孩子可能名叫 James。不过，建议确认最准确、最新的信息，因为情况可能随时间变化。该模型可能并不总能反映最新信息。
 ```
-These predicted answers are all INCORRECT because:
-    - A factual statement in the answer contradicts the gold target. Incorrect statements that have some hedging (e.g., "it is possible that", "although i'm not sure, i think") are also considered incorrect.
+这些预测答案都属于 INCORRECT，原因是：
+    - 答案中的某项事实陈述与标准答案相矛盾。带有保留性表述的错误陈述（例如“有可能”“虽然不确定，但我认为”）也视为错误。
 
-
-The following are examples of NOT_ATTEMPTED predicted answers.
+以下是被评为 NOT_ATTEMPTED 的预测答案示例。
 ```
-Question: What are the names of Barack Obama's children?
-Gold target: Malia and Sasha
-Predicted answer 1: I don't know.
-Predicted answer 2: I need more context about which Obama you are talking about.
-Predicted answer 3: Without researching the web, I cannot answer this question. However, I can tell you that Barack Obama has two children.
-Predicted answer 4: Barack Obama has two children. I know that one of them is Malia, but I'm not sure about the other one.
+问题：Barack Obama 的孩子叫什么名字？
+标准答案：Malia 和 Sasha
+预测答案 1：我不知道。
+预测答案 2：我需要更多上下文，才能知道你说的是哪位 Obama。
+预测答案 3：不进行网络研究，我无法回答这个问题。不过，我可以告诉你，Barack Obama 有两个孩子。
+预测答案 4：Barack Obama 有两个孩子。我知道其中一个是 Malia，但不确定另一个是谁。
 ```
-These predicted answers are all NOT_ATTEMPTED because:
-    - The important information in the gold target is not included in the answer.
-    - No statements in the answer contradict the gold target.
+这些预测答案都属于 NOT_ATTEMPTED，原因是：
+    - 答案中没有包含标准答案中的重要信息。
+    - 答案中没有任何陈述与标准答案相矛盾。
 
+还请注意以下事项：
+- 对于标准答案是数字的问题，预测答案需要精确到标准答案的最后一位有效数字。例如，问题为“Transformer 论文有多少次引用？”，标准答案为“120k”。
+    - 预测答案“120k”“124k”和“115k”都属于 CORRECT。
+    - 预测答案“100k”和“113k”属于 INCORRECT。
+    - 预测答案“约 100k”和“超过 50k”属于 NOT_ATTEMPTED，因为它们既没有确认，也没有否定标准答案。
+- 标准答案可能包含超出问题范围的信息。在这种情况下，预测答案只需要包含问题所问的信息。
+    - 例如，问题为“《实习医生格蕾》中 Derek 和 Meredith 在哪一集合法结婚？”，标准答案为“第 7 季第 20 集：White Wedding”。“第 7 季第 20 集”或“White Wedding”都应被视为 CORRECT。
+- 如果预测答案省略了可以从问题中明确推断出的信息，不要扣分。
+    - 例如，问题为“OpenAI 总部位于哪个城市？”，标准答案为“San Francisco, California”。预测答案“San Francisco”应被视为 CORRECT，即使没有包含“California”。
+    - 问题为“论文 A pretrainer's guide to training data: Measuring the effects of data age, domain coverage, quality, & toxicity 在 NAACL '24 获得了什么奖？”，标准答案为“Outstanding Paper Award”。预测答案“Outstanding Paper”应被视为 CORRECT，因为问题中已经隐含了“award”。
+    - 对于问题“Jason Wei 的身高是多少米？”，标准答案为“1.73 m”。预测答案“1.75”应被视为 CORRECT，因为问题中已经指定单位为米。
+    - 对于问题“Barack Obama 的妻子叫什么名字？”，标准答案为“Michelle Obama”。预测答案“Michelle”应被视为 CORRECT，因为可以推断其姓氏。
+- 如果明显是同一个名字，不要因人名中的拼写错误扣分。
+    - 例如，标准答案为“Hyung Won Chung”时，可以将以下预测答案视为正确：“Hyoong Won Choong”“Hyungwon Chung”或“Hyun Won Chung”。
 
-Also note the following things:
-- For grading questions where the gold target is a number, the predicted answer needs to be correct to the last significant figure in the gold answer. For example, consider a question "How many citations does the Transformer Paper have?" with gold target "120k". 
-    - Predicted answers "120k", "124k", and 115k" are all CORRECT. 
-    - Predicted answers "100k" and "113k" are INCORRECT. 
-    - Predicted answers "around 100k" and "more than 50k" are considered NOT_ATTEMPTED because they neither confirm nor contradict the gold target.
-- The gold target may contain more information than the question. In such cases, the predicted answer only needs to contain the information that is in the question.
-    - For example, consider the question "What episode did Derek and Meredith get legally married in Grey's Anatomy?" with gold target "Season 7, Episode 20: White Wedding". Either "Season 7, Episode 20" or "White Wedding" would be considered a CORRECT answer.
-- Do not punish predicted answers if they omit information that would be clearly inferred from the question.
-    - For example, consider the question "What city is OpenAI headquartered in?" and the gold target "San Francisco, California". The predicted answer "San Francisco" would be considered CORRECT, even though it does not include "California".
-    - Consider the question "What award did A pretrainer's guide to training data: Measuring the effects of data age, domain coverage, quality, & toxicity win at NAACL '24?", the gold target is "Outstanding Paper Award". The predicted answer "Outstanding Paper" would be considered CORRECT, because "award" is presumed in the question.
-    - For the question "What is the height of Jason Wei in meters?", the gold target is "1.73 m". The predicted answer "1.75" would be considered CORRECT, because meters is specified in the question.
-    - For the question "What is the name of Barack Obama's wife?", the gold target is "Michelle Obama". The predicted answer "Michelle" would be considered CORRECT, because the last name can be presumed.
-- Do not punish for typos in people's name if it's clearly the same name. 
-    - For example, if the gold target is "Hyung Won Chung", you can consider the following predicted answers as correct: "Hyoong Won Choong", "Hyungwon Chung", or "Hyun Won Chung".
-
-
-Here is a new example. Simply reply with either CORRECT, INCORRECT, NOT ATTEMPTED. Don't apologize or correct yourself if there was a mistake; we are just trying to grade the answer.
+下面是一个新示例。只需回复 CORRECT、INCORRECT 或 NOT ATTEMPTED。如果出现错误，不要道歉或自我纠正；我们只是要给答案评分。
 ```
-Question: {question}
-Gold target: {target}
-Predicted answer: {predicted_answer}
+问题：{question}
+标准答案：{target}
+预测答案：{predicted_answer}
 ```
 
-Grade the predicted answer of this new question as one of:
+将这个新问题的预测答案评为以下之一：
 A: CORRECT
 B: INCORRECT
 C: NOT_ATTEMPTED
 
-Just return the letters "A", "B", or "C", with no text around it.
+只返回字母 "A"、"B" 或 "C"，前后不要附加任何文字。
 """.strip()
 
 

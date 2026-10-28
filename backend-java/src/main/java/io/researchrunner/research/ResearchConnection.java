@@ -45,6 +45,11 @@ public final class ResearchConnection implements AutoCloseable {
         return !cancelled && !finished && (run+":"+round).equals(requestId)
                 && human!=null && human.submit(run,round,feedback);
     }
+
+    /** Legacy protocol: no run/round identifiers, bound to this connection's current review. */
+    public synchronized boolean feedbackLegacy(String feedback) {
+        return !cancelled && !finished && human!=null && human.submitCurrent(feedback);
+    }
     public void emit(Map<String,Object> event) throws Exception {
         synchronized(this) {if(cancelled)throw new CancellationException();}
         runs.append(run.runId(),event);

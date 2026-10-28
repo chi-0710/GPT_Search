@@ -22,6 +22,8 @@ public class ConfiguredEmbeddings implements EmbeddingGateway {
     @Override public List<float[]> embed(List<String> texts) {
         if (texts.isEmpty()) return List.of();
         Profile profile=configuration();
+        io.researchrunner.research.ProviderCatalog.require(
+                io.researchrunner.research.ProviderCatalog.Kind.EMBEDDING,profile.provider());
         var variables=new HashMap<String,String>();
         for (String name:List.of("OPENAI_API_KEY","OPENAI_BASE_URL","DASHSCOPE_API_KEY","DASHSCOPE_BASE_URL",
                 "NEBIUS_API_KEY","NEBIUS_BASE_URL","AIMLAPI_API_KEY","MINIMAX_API_KEY","OPENROUTER_API_KEY")) {

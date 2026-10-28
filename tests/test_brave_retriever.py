@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from gpt_researcher.retrievers.brave.brave import BraveSearch
+from search.retrievers.brave.brave import BraveSearch
 
 
 class TestBraveSearch(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestBraveSearch(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "BRAVE_API_KEY"):
                 BraveSearch("test query")
 
-    @patch("gpt_researcher.retrievers.brave.brave.requests.get")
+    @patch("search.retrievers.brave.brave.requests.get")
     def test_search_normalizes_results(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = {

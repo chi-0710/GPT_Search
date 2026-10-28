@@ -23,6 +23,7 @@ interface CopilotResearchContentProps {
   isProcessingChat?: boolean;
   onNewResearch?: () => void;
   toggleSidebar?: () => void;
+  onStop?: () => void;
 }
 
 export default function CopilotResearchContent({
@@ -44,7 +45,8 @@ export default function CopilotResearchContent({
   reset,
   isProcessingChat = false,
   onNewResearch,
-  toggleSidebar
+  toggleSidebar,
+  onStop
 }: CopilotResearchContentProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   // Initialize copilot as hidden when loading
@@ -335,6 +337,17 @@ export default function CopilotResearchContent({
           transition: width 0.3s ease;
         }
       `}</style>
+
+      {loading && onStop && (
+        <button
+          type="button"
+          onClick={onStop}
+          className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-full bg-red-600 text-white text-sm shadow-lg hover:bg-red-700 transition-colors"
+          aria-label="停止研究"
+        >
+          停止研究
+        </button>
+      )}
     </div>
   );
 } 

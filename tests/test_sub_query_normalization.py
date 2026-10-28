@@ -9,7 +9,7 @@ whole research run. `_normalize_sub_queries` guarantees a flat `list[str]`.
 
 import unittest
 
-from gpt_researcher.actions.query_processing import _normalize_sub_queries
+from search.actions.query_processing import _normalize_sub_queries
 
 
 class TestNormalizeSubQueries(unittest.TestCase):

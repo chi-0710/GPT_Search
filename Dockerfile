@@ -51,11 +51,7 @@ ENV WORKERS=${WORKERS}
 # Create a non-root user for security
 # NOTE: Don't use this if you are relying on `_check_pkg` to pip install packages dynamically.
 RUN useradd -ms /bin/bash gpt-researcher && \
-    chown -R gpt-researcher:gpt-researcher /usr/src/app && \
-    # Add these lines to create and set permissions for outputs directory
-    mkdir -p /usr/src/app/outputs && \
-    chown -R gpt-researcher:gpt-researcher /usr/src/app/outputs && \
-    chmod 777 /usr/src/app/outputs
+    chown -R gpt-researcher:gpt-researcher /usr/src/app
 USER gpt-researcher
 WORKDIR /usr/src/app
 

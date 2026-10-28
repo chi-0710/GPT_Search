@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "gpt_researcher" / "retrievers" / "groundroute" / "groundroute.py"
+MODULE_PATH = ROOT / "search" / "retrievers" / "groundroute" / "groundroute.py"
 
 
 def _load():
@@ -19,7 +19,7 @@ def _load():
         if "groundroute.groundroute" in key:
             sys.modules.pop(key, None)
     spec = importlib.util.spec_from_file_location(
-        "gpt_researcher.retrievers.groundroute.groundroute_testmod", MODULE_PATH
+        "search.retrievers.groundroute.groundroute_testmod", MODULE_PATH
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

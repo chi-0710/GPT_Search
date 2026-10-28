@@ -13,7 +13,7 @@ from unittest.mock import patch
 if "requests" not in sys.modules:
     sys.modules["requests"] = types.ModuleType("requests")
 
-from gpt_researcher.retrievers.serper.serper import SerperSearch  # noqa: E402
+from search.retrievers.serper.serper import SerperSearch  # noqa: E402
 
 
 def _make(monkeypatch_env):
@@ -26,7 +26,7 @@ def _make(monkeypatch_env):
 def test_search_returns_list_when_response_none():
     s = _make(None)
     with patch(
-        "gpt_researcher.retrievers.serper.serper.requests.request",
+        "search.retrievers.serper.serper.requests.request",
         return_value=None,
     ):
         out = s.search()
@@ -41,7 +41,7 @@ def test_search_returns_list_when_body_unparseable():
         text = "<<not json>>"
 
     with patch(
-        "gpt_researcher.retrievers.serper.serper.requests.request",
+        "search.retrievers.serper.serper.requests.request",
         return_value=_Resp(),
     ):
         out = s.search()
@@ -55,7 +55,7 @@ def test_search_returns_list_when_json_null():
         text = "null"
 
     with patch(
-        "gpt_researcher.retrievers.serper.serper.requests.request",
+        "search.retrievers.serper.serper.requests.request",
         return_value=_Resp(),
     ):
         out = s.search()

@@ -1,0 +1,23 @@
+services:
+  gpt-researcher:
+    volumes:
+      - ./backend:/usr/src/app/backend
+      - ./search:/usr/src/app/search
+      - ./multi_agents:/usr/src/app/multi_agents
+      - ./main.py:/usr/src/app/main.py
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /usr/src/app/backend
+      - --reload-dir
+      - /usr/src/app/search
+      - --reload-dir
+      - /usr/src/app/multi_agents
+      - --reload-dir
+      - /usr/src/app

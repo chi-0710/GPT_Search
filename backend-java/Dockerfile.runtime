@@ -1,0 +1,11 @@
+# Docker image for a pre-built JAR (used by docker compose in this repository).
+#
+# The container build environment has no Maven Central access here, so the JAR is built on the
+# host with scripts/java_build.ps1 (offline-capable Maven cache) and copied into the image.
+# CI/network-enabled environments can instead build backend-java/Dockerfile (multi-stage Maven).
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+COPY target-image/app.jar app.jar
+USER 10001:10001
+EXPOSE 8000
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

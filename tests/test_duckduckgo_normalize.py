@@ -7,22 +7,22 @@ from unittest.mock import MagicMock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "gpt_researcher" / "retrievers" / "duckduckgo" / "duckduckgo.py"
+MODULE_PATH = ROOT / "search" / "retrievers" / "duckduckgo" / "duckduckgo.py"
 
 
 def _load_duckduckgo_module():
-    # Load the module file directly so we never import gpt_researcher package
+    # Load the module file directly so we never import search package
     # (pulling json_repair and other heavy deps is unrelated to this unit).
-    utils_mod = types.ModuleType("gpt_researcher.retrievers.utils")
+    utils_mod = types.ModuleType("search.retrievers.utils")
     utils_mod.check_pkg = lambda *a, **k: None
-    pkg = types.ModuleType("gpt_researcher")
-    retrievers = types.ModuleType("gpt_researcher.retrievers")
-    sys.modules.setdefault("gpt_researcher", pkg)
-    sys.modules.setdefault("gpt_researcher.retrievers", retrievers)
-    sys.modules["gpt_researcher.retrievers.utils"] = utils_mod
+    pkg = types.ModuleType("search")
+    retrievers = types.ModuleType("search.retrievers")
+    sys.modules.setdefault("search", pkg)
+    sys.modules.setdefault("search.retrievers", retrievers)
+    sys.modules["search.retrievers.utils"] = utils_mod
 
     spec = importlib.util.spec_from_file_location(
-        "gpt_researcher.retrievers.duckduckgo.duckduckgo", MODULE_PATH
+        "search.retrievers.duckduckgo.duckduckgo", MODULE_PATH
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

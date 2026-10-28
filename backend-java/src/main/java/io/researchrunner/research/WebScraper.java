@@ -11,9 +11,14 @@ import org.jsoup.Jsoup;
 public final class WebScraper {
     private final int timeoutMillis;
     private final int maxBytes;
+    private final boolean allowPrivateHosts;
     public WebScraper(Duration timeout, int maxBytes) {
+        this(timeout, maxBytes, false);
+    }
+    public WebScraper(Duration timeout, int maxBytes, boolean allowPrivateHosts) {
         if(timeout.isNegative() || timeout.isZero() || maxBytes<1) throw new IllegalArgumentException("抓取限制无效");
         this.timeoutMillis=Math.toIntExact(timeout.toMillis()); this.maxBytes=maxBytes;
+        this.allowPrivateHosts=allowPrivateHosts;
     }
 
     public SearchGateway.Hit fetch(String url,List<String> domains) throws Exception {
@@ -21,6 +26,10 @@ public final class WebScraper {
         for(int redirect=0;redirect<=5;redirect++) {
             if(Thread.currentThread().isInterrupted()) throw new InterruptedException("抓取已取消");
             if(!policy.permits(url)) throw new IllegalArgumentException("网页不在允许的域名范围内");
+            // A6-04: block loopback/private/link-local targets unless a caller explicitly opts in
+            // (tests use a local HTTP server; production scraping only reaches public hosts).
+            if(!allowPrivateHosts && !RemoteDocuments.isPublicHttp(URI.create(url)))
+                throw new IllegalArgumentException("网页地址不允许访问（内网或非 HTTP 地址）");
             var response=Jsoup.connect(url).userAgent("ResearchRunner/1.0")
                     .timeout(timeoutMillis).maxBodySize(maxBytes+1).followRedirects(false)
                     .ignoreContentType(true).ignoreHttpErrors(true).execute();

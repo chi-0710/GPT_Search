@@ -15,7 +15,7 @@ import pytest
 
 def _make_search():
     with patch.dict(os.environ, {"BOCHA_API_KEY": "test-key"}):
-        from gpt_researcher.retrievers.bocha.bocha import BoChaSearch
+        from search.retrievers.bocha.bocha import BoChaSearch
 
         return BoChaSearch("test query")
 
@@ -27,7 +27,7 @@ def test_missing_keys_returns_empty_list():
     resp.json.return_value = {"unexpected": "shape"}  # no data.webPages.value
 
     with patch(
-        "gpt_researcher.retrievers.bocha.bocha.requests.post", return_value=resp
+        "search.retrievers.bocha.bocha.requests.post", return_value=resp
     ):
         assert search.search() == []
 
@@ -37,7 +37,7 @@ def test_request_exception_returns_empty_list():
 
     search = _make_search()
     with patch(
-        "gpt_researcher.retrievers.bocha.bocha.requests.post",
+        "search.retrievers.bocha.bocha.requests.post",
         side_effect=requests.RequestException("boom"),
     ):
         assert search.search() == []
@@ -59,7 +59,7 @@ def test_valid_payload_is_normalized():
     }
 
     with patch(
-        "gpt_researcher.retrievers.bocha.bocha.requests.post", return_value=resp
+        "search.retrievers.bocha.bocha.requests.post", return_value=resp
     ):
         results = search.search()
 

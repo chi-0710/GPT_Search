@@ -8,7 +8,7 @@ The scrape path used ``self.url.endswith(".pdf")``, which:
 These tests pin the corrected behavior via the ``_is_pdf_url`` helper.
 """
 
-from gpt_researcher.scraper.browser.browser import _is_pdf_url
+from search.scraper.browser.browser import _is_pdf_url
 
 
 def test_plain_pdf_url_detected():

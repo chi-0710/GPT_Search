@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Callable, List, TypeVar
 from tqdm import tqdm
 from dotenv import load_dotenv
-from gpt_researcher.agent import GPTResearcher
-from gpt_researcher.utils.enum import ReportType, ReportSource, Tone
+from search.agent import Research
+from search.utils.enum import ReportType, ReportSource, Tone
 from evals.simple_evals.simpleqa_eval import SimpleQAEval
 from langchain_openai import ChatOpenAI
 
@@ -58,7 +58,7 @@ async def evaluate_single_query(query: str, evaluator: SimpleQAEval) -> dict:
     
     t_start = time.perf_counter()   # timmer for each query
 
-    researcher = GPTResearcher(
+    researcher = Research(
         query=query,
         report_type=ReportType.ResearchReport.value,
         report_format="markdown",
@@ -124,7 +124,7 @@ async def main(num_examples: int):
         if not evaluator.examples:
             raise ValueError("No examples loaded in evaluator")
         
-        print(f"Starting GPT-Researcher evaluation with {num_examples} test queries...")
+        print(f"Starting ResearchRunner evaluation with {num_examples} test queries...")
         
         # get evaluation for each example
         results = []
@@ -246,7 +246,7 @@ async def main(num_examples: int):
         raise
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run GPT-Researcher evaluation')
+    parser = argparse.ArgumentParser(description='Run ResearchRunner evaluation')
     parser.add_argument('--num_examples', type=int, default=1,
                       help='Number of examples to evaluate. Default is 1 example.')
     args = parser.parse_args()

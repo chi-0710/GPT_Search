@@ -28,7 +28,7 @@ class TestWebSocket(WebSocket):
 @pytest.mark.asyncio
 async def test_log_output_file():
     """Test to verify logs are properly written to output file"""
-    from gpt_researcher.agent import GPTResearcher
+    from search.agent import Research
     from backend.server.server_utils import CustomLogsHandler
     
     # 1. Setup like the main app
@@ -39,7 +39,7 @@ async def test_log_output_file():
     query = "What is the capital of France?"
     research_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{hash(query)}"
     logs_handler = CustomLogsHandler(websocket=websocket, task=research_id)
-    researcher = GPTResearcher(query=query, websocket=logs_handler)
+    researcher = Research(query=query, websocket=logs_handler)
     
     # 3. Run research
     await researcher.conduct_research()

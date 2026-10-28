@@ -15,16 +15,16 @@ class FactCheckerAgent:
         conclusion = research_state.get("conclusion", "")
         data = research_state.get("research_data", [])
         
-        draft = f"Introduction:\n{intro}\n\nSections Data:\n{data}\n\nConclusion:\n{conclusion}"
+        draft = f"引言：\n{intro}\n\n章节资料：\n{data}\n\n结论：\n{conclusion}"
 
         prompt = [
             {
                 "role": "system",
-                "content": "You are a diligent Fact Checker Agent. Your goal is to review a research report draft, identify potential factual inaccuracies, hallucinations, or inconsistencies based on the provided research context, and decide if it needs to be sent back to the writer for revision.",
+                "content": "你是一名严谨的事实核查智能体。你的目标是依据所提供的研究上下文审查研究报告草稿，识别潜在的事实错误、幻觉或不一致，并决定是否需要退回撰写者修订。",
             },
             {
                 "role": "user",
-                "content": f"Review the following draft for factual accuracy:\n\n{draft}\n\nIf you find critical errors, provide a list of them so the writer can revise the draft. If the draft is factually sound, return exactly the string 'None'. Do not return any other text if it is accepted."
+                "content": f"请核查以下草稿的事实准确性：\n\n{draft}\n\n如果发现关键错误，请使用简体中文列出问题，以便撰写者修订。如果草稿在事实层面可靠，请仅返回字符串 'None'。接受草稿时不得返回任何其他文字。"
             }
         ]
 
@@ -36,7 +36,7 @@ class FactCheckerAgent:
             await self.stream_output(
                 "logs",
                 "fact_checking",
-                f"Checking facts in the assembled draft...",
+                f"正在核查合并草稿中的事实...",
                 self.websocket,
             )
         else:
@@ -49,12 +49,12 @@ class FactCheckerAgent:
         if is_none_accept_response(review):
             review = None
             if self.websocket and self.stream_output:
-                await self.stream_output("logs", "fact_checking", "Draft accepted by Fact Checker.", self.websocket)
+                await self.stream_output("logs", "fact_checking", '草稿已通过事实核查。', self.websocket)
             else:
                 print_agent_output("Draft accepted by Fact Checker.", agent="FACT_CHECKER")
         else:
             if self.websocket and self.stream_output:
-                await self.stream_output("logs", "fact_checking", f"Fact Checker found issues: {review}...", self.websocket)
+                await self.stream_output("logs", "fact_checking", f"事实核查发现以下问题：{review}...", self.websocket)
             else:
                 print_agent_output(f"Fact Checker found issues: {review}...", agent="FACT_CHECKER")
 

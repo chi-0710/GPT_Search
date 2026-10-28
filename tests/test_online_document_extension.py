@@ -1,6 +1,6 @@
 """Regression test for OnlineDocumentLoader._get_extension case handling."""
 
-from gpt_researcher.document.online_document import OnlineDocumentLoader
+from search.document.online_document import OnlineDocumentLoader
 
 
 def test_get_extension_lowercases_uppercase_suffix():

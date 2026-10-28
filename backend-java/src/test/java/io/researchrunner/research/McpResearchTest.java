@@ -54,6 +54,43 @@ class McpResearchTest {
         for(String command:List.of("python","uvx","npx"))
             assertThrows(IllegalArgumentException.class,()->McpResearch.parse(List.of(Map.of("command",command)),new MockEnvironment().withProperty("JAVA_MCP_ALLOWED_COMMANDS","python,uvx")));
     }
+    @Test void deepStrategyRunsMultipleRoundsWhileFastRunsOnce() throws Exception {
+        var json=new ObjectMapper();var calls=new AtomicInteger();
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/mcp",exchange->{
+            if(!exchange.getRequestMethod().equals("POST")){exchange.sendResponseHeaders(405,-1);exchange.close();return;}
+            var request=json.readTree(exchange.getRequestBody());
+            if(!request.has("id")){exchange.sendResponseHeaders(202,-1);exchange.close();return;}
+            Object result=switch(request.path("method").asText()) {
+                case "initialize" -> Map.of("protocolVersion",request.path("params").path("protocolVersion").asText(),"capabilities",Map.of("tools",Map.of()),"serverInfo",Map.of("name","fixture","version","1"));
+                case "tools/list" -> Map.of("tools",List.of(Map.of("name","lookup","description","read","inputSchema",Map.of("type","object","properties",Map.of("query",Map.of("type","string"))))));
+                case "tools/call" -> {calls.incrementAndGet();yield Map.of("content",List.of(Map.of("type","text","text","深挖证据 "+calls.get())),"isError",false);}
+                default -> Map.of();
+            };
+            byte[] bytes=json.writeValueAsBytes(Map.of("jsonrpc","2.0","id",request.get("id"),"result",result));
+            exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
+        });server.start();
+        try {
+            String url="http://127.0.0.1:"+server.getAddress().getPort()+"/mcp";
+            var selections=new AtomicInteger();
+            ResearchNodes.Model model=(stage,prompt,input)->selections.incrementAndGet()<=2
+                    ?"{\"calls\":[{\"name\":\"fixture::lookup\",\"arguments\":{\"query\":\"问题\"}}]}"
+                    :"{\"calls\":[]}";
+            try(var client=new McpResearch(json,Duration.ofSeconds(5),List.of(),"deep",3)) {
+                client.connect(McpResearch.parse(List.of(Map.of("name","fixture","connection_url",url)),new MockEnvironment()));
+                var rows=client.collect("问题",model);
+                assertEquals(2,calls.get(),"deep 应执行两轮工具调用");
+                assertEquals(2,rows.size());
+            }
+            calls.set(0);selections.set(0);
+            try(var client=new McpResearch(json,Duration.ofSeconds(5),List.of(),"fast",3)) {
+                client.connect(McpResearch.parse(List.of(Map.of("name","fixture","connection_url",url)),new MockEnvironment()));
+                client.collect("问题",model);
+                assertEquals(1,calls.get(),"fast 只执行一轮");
+            }
+        } finally {server.stop(0);}
+    }
+
     @Test void timeoutAndCancellationReleaseStdioProcesses() throws Exception {
         String executable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
         for(boolean cancel:List.of(false,true)) {

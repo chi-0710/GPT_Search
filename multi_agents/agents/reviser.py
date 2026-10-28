@@ -5,9 +5,9 @@ import json
 sample_revision_notes = """
 {
   "draft": { 
-    draft title: The revised draft that you are submitting for review 
+    草稿标题: 提交复审的修订后草稿
   },
-  "revision_notes": Your message to the reviewer about the changes you made to the draft based on their feedback
+  "revision_notes": 向审阅者说明你根据其反馈所做修改的消息
 }
 """
 
@@ -30,15 +30,15 @@ class ReviserAgent:
         prompt = [
             {
                 "role": "system",
-                "content": "You are an expert writer. Your goal is to revise drafts based on reviewer notes.",
+                "content": "你是一名专业撰稿人，负责根据审阅意见修订草稿，并确保草稿和修订说明使用简体中文。",
             },
             {
                 "role": "user",
-                "content": f"""Draft:\n{draft_report}\nReviewer's notes:\n{review}\n\n
-You have been tasked by your reviewer with revising the following draft, which was written by a non-expert.
-If you decide to follow the reviewer's notes, please write a new draft and make sure to address all of the points they raised.
-Please keep all other aspects of the draft the same.
-You MUST return nothing but a JSON in the following format:
+                "content": f"""草稿：\n{draft_report}\n审阅意见：\n{review}\n\n
+审阅者要求你修订以下由非专业人员撰写的草稿。
+如果采纳审阅意见，请撰写一份新草稿，并确保解决审阅者提出的所有问题。
+其他方面必须保持不变，修订后的草稿必须使用简体中文。
+除以下格式的 JSON 外不要返回任何内容，并保留字段名 'draft' 和 'revision_notes'：
 {sample_revision_notes}
 """,
             },
@@ -60,7 +60,7 @@ You MUST return nothing but a JSON in the following format:
                 await self.stream_output(
                     "logs",
                     "revision_notes",
-                    f"Revision notes: {revision.get('revision_notes')}",
+                    f"修订说明：{revision.get('revision_notes')}",
                     self.websocket,
                 )
             else:

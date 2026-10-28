@@ -5,7 +5,7 @@ References section order vary run-to-run. add_references must emit the URLs
 in a stable (sorted) order.
 """
 
-from gpt_researcher.actions.markdown_processing import add_references
+from search.actions.markdown_processing import add_references
 
 
 def test_add_references_renders_in_sorted_order():

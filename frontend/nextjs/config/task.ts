@@ -12,9 +12,9 @@ export const task = {
     "source": "web",
     "follow_guidelines": true,
     "guidelines": [
-      "The report MUST fully answer the original question",
-      "The report MUST be written in apa format",
-      "The report MUST be written in english"
+      "报告必须完整回答原始问题",
+      "报告必须使用 APA 格式",
+      "报告必须使用简体中文撰写"
     ],
     "verbose": true
   },

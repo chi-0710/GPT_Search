@@ -55,7 +55,7 @@ stdio 必须由运维配置 `JAVA_MCP_ALLOWED_COMMANDS` 精确允许程序；不
 ./scripts/test_java_live.ps1 -Source hybrid
 ```
 
-测试脚本创建独立数据库和网络，不挂载业务数据卷。真实验收读取原 DeepSeek、DashScope/Qwen、Tavily 配置，使用 `acceptance/live-runs.json` 累计最多六次，每次最多两章。日志、下载文件和测试库备份保存在忽略的 `target/live-acceptance/`；不要将包含业务内容或凭据的日志提交到仓库。不要并发运行真实验收脚本或删除预算记录。
+测试脚本创建独立数据库和网络，不挂载业务数据卷。真实验收读取原 DeepSeek、DashScope/Qwen、Tavily 配置，使用 `target/live-acceptance/live-runs.json` 累计最多六次，每次最多两章。日志、下载文件和测试库备份保存在忽略的 `target/live-acceptance/`；不要将包含业务内容或凭据的日志提交到仓库。不要并发运行真实验收脚本或删除预算记录。
 
 2026-10-28 第一次 web 实测在 Tavily TLS 握手失败，未发布报告；随后无凭据检查也发现 DashScope TLS 失败。DeepSeek 地址可达仅说明网络连通，不是模型、工具调用或研究通过。余下实测暂不运行，直到网络恢复。
 

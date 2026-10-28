@@ -1,5 +1,5 @@
-from gpt_researcher.config.config import Config
-from gpt_researcher.utils.llm import create_chat_completion
+from search.config.config import Config
+from search.utils.llm import create_chat_completion
 import asyncio
 from dotenv import load_dotenv
 load_dotenv()

@@ -11,7 +11,7 @@ from unittest.mock import patch
 if "requests" not in sys.modules:
     sys.modules["requests"] = types.ModuleType("requests")
 
-from gpt_researcher.retrievers.pubmed_central.pubmed_central import (  # noqa: E402
+from search.retrievers.pubmed_central.pubmed_central import (  # noqa: E402
     PubMedCentralSearch,
 )
 

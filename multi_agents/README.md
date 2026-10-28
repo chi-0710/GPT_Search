@@ -1,8 +1,9 @@
-# LangGraph x GPT Researcher
+> 当前实现：仅保留 LangGraph 多智能体报告，支持网络、文件和混合资料来源。旧报告模式请求自动转换；内部草稿格式继续保留。
+
+# LangGraph x ResearchRunner
 [LangGraph](https://python.langchain.com/docs/langgraph) is a library for building stateful, multi-actor applications with LLMs. 
 This example uses Langgraph to automate the process of an in depth research on any given topic.
 
-Looking for the AG2 version? See `multi_agents/ag2/` and the AG2 docs page.
 
 ## Use case
 By using Langgraph, the research process can be significantly improved in depth and quality by leveraging multiple agents with specialized skills. 
@@ -11,7 +12,7 @@ Inspired by the recent [STORM](https://arxiv.org/abs/2402.14207) paper, this exa
 
 An average run generates a 5-6 page research report in multiple formats such as PDF, Docx and Markdown.
 
-Please note: Multi-agents are utilizing the same configuration of models like GPT-Researcher does. However, only the SMART_LLM is used for the time being. Please refer to the [LLM config pages](https://docs.gptr.dev/docs/gpt-researcher/llms).
+Please note: Multi-agents are utilizing the same configuration of models like ResearchRunner does. However, only the SMART_LLM is used for the time being. Please refer to the [LLM config pages](https://docs.gptr.dev/docs/gpt-researcher/llms).
 
 ## The Multi Agent Team
 The research team is made up of 8 agents:
@@ -54,7 +55,7 @@ More specifically (as seen in the architecture diagram) the process is as follow
     ```bash
     pip install -r requirements.txt
     ```
-3. Update env variables, see the [GPT-Researcher docs](https://docs.gptr.dev/docs/gpt-researcher/llms) for more details.
+3. Update env variables, see the [ResearchRunner docs](https://docs.gptr.dev/docs/gpt-researcher/llms) for more details.
 
 2. Run the application:
     ```bash
@@ -69,8 +70,7 @@ To change the research query and customize the report, edit the `task.json` file
 - `max_sections` - The maximum number of sections in the report. Each section is a subtopic of the research query.
 - `max_plan_revisions` - The maximum number of human-requested plan revisions before the workflow exits with a clear error. Set to `null` to rely on LangGraph's recursion limit instead.
 - `include_human_feedback` - If true, the user can provide feedback to the agents. If false, the agents will work autonomously.
-- `publish_formats` - The formats to publish the report in. The reports will be written in the `output` directory.
-- `source` - The location from which to conduct the research. Options: `web` or `local`. For local, please add `DOC_PATH` env var.
+- `source` - Research sources: `web`, `local`, or `hybrid`. Local research uses the PostgreSQL document library and the document scope frozen when the run starts.
 - `follow_guidelines` - If true, the research report will follow the guidelines below. It will take longer to complete. If false, the report will be generated faster but may not follow the guidelines.
 - `guidelines` - A list of guidelines that the report must follow.
 - `verbose` - If true, the application will print detailed logs to the console.
@@ -82,11 +82,6 @@ To change the research query and customize the report, edit the `task.json` file
   "model": "gpt-4o",
   "max_sections": 3,
   "max_plan_revisions": 3,
-  "publish_formats": { 
-    "markdown": true,
-    "pdf": true,
-    "docx": true
-  },
   "include_human_feedback": false,
   "source": "web",
   "follow_guidelines": true,
@@ -100,6 +95,11 @@ To change the research query and customize the report, edit the `task.json` file
 ```
 
 ## To Deploy
+
+The publisher only assembles Markdown. HTTP, WebSocket and CLI exports are created
+once through `backend/server/artifact_service.py` and stored in PostgreSQL.
+The old `publish_formats` task option is ignored; it no longer writes local files.
+Use the CLI's `--no-pdf` and `--no-docx` options to disable individual exports.
 
 ```shell
 pip install langgraph-cli
