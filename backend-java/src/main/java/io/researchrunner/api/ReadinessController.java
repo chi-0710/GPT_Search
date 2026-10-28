@@ -13,11 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReadinessController {
     private final HistoryMapper mapper;
     private final String expected;
+    private final boolean requireFlyway;
+    private final String expectedJava;
 
     public ReadinessController(HistoryMapper mapper,
-            @Value("${researchrunner.expected-migration}") String expected) {
+            @Value("${researchrunner.expected-migration}") String expected,
+            @Value("${JAVA_REQUIRE_FLYWAY:false}") boolean requireFlyway,
+            @Value("${JAVA_EXPECTED_MIGRATION:1}") String expectedJava) {
         this.mapper = mapper;
         this.expected = expected;
+        this.requireFlyway=requireFlyway;this.expectedJava=expectedJava;
     }
 
     @GetMapping("/health/ready")
@@ -34,7 +39,10 @@ public class ReadinessController {
             status.put("database", "ok");
             status.put("pgvector", vector);
             status.put("migration", migration);
-            status.put("ready", vector && expected.equals(migration));
+            boolean managed=mapper.flywayTableExists();String javaVersion=managed?mapper.flywayVersion():null;
+            status.put("java_migration",javaVersion);
+            status.put("ready", vector && expected.equals(migration)
+                    && (managed?expectedJava.equals(javaVersion) && mapper.flywayHealthy():!requireFlyway));
         } catch (DataAccessException exception) {
             // Never expose a JDBC URL, SQL statement, credentials or driver exception.
             status.put("error", "PostgreSQL 存储服务不可用");

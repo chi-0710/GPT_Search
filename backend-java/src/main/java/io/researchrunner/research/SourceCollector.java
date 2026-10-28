@@ -5,6 +5,7 @@ import java.util.concurrent.CancellationException;
 
 /** Run-scoped source selection reused by initial and section research. */
 public final class SourceCollector {
+    @FunctionalInterface public interface McpCollector {List<Map<String,Object>> collect(String query) throws Exception;}
     @FunctionalInterface public interface LocalRetriever {
         List<Map<String,Object>> retrieve(String query,List<UUID> frozenIds) throws Exception;
     }
@@ -24,9 +25,14 @@ public final class SourceCollector {
     private final SearchGateway search;
     private final Scraper scraper;
     private final EvidenceRegistry evidence;
+    private final McpCollector mcp;
 
     public SourceCollector(Selection selection,LocalRetriever local,SearchGateway search,Scraper scraper,EvidenceRegistry evidence) {
+        this(selection,local,search,scraper,evidence,null);
+    }
+    public SourceCollector(Selection selection,LocalRetriever local,SearchGateway search,Scraper scraper,EvidenceRegistry evidence,McpCollector mcp) {
         this.selection=selection;this.local=local;this.search=search;this.scraper=scraper;this.evidence=evidence;
+        this.mcp=mcp;
     }
 
     public Collected collect(String query,int localBudget,int webBudget) throws Exception {
@@ -68,7 +74,16 @@ public final class SourceCollector {
                     if(sources.size()>=selection.limit())break;
                 }
                 webIds=evidence.register(sources,"web");
-            } catch(Exception failure) {propagateCancellation(failure);if(selection.source().equals("web"))throw failure;}
+            } catch(Exception failure) {propagateCancellation(failure);if(selection.source().equals("web") && mcp==null)throw failure;evidence.warn("网络检索失败，尝试其他已配置来源");}
+            if(mcp!=null) {
+                try {
+                    var combined=new ArrayList<>(webIds);combined.addAll(evidence.register(mcp.collect(query),"mcp"));webIds=List.copyOf(combined);
+                } catch(Exception failure) {
+                    propagateCancellation(failure);
+                    if(webIds.isEmpty() && localIds.isEmpty())throw failure;
+                    evidence.warn("MCP 来源失败，使用其他已取得的证据");
+                }
+            }
             if(webIds.isEmpty())evidence.warn("网络来源未提供可用证据"+(selection.source().equals("hybrid")?"，尝试使用文件来源":""));
         }
         checkCancelled();

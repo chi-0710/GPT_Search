@@ -30,6 +30,8 @@ public interface DocumentWriteMapper {
     int delete(@Param("id") UUID id);
     @Update("UPDATE documents SET status=#{status},error=#{error},updated_at=now() WHERE id=#{id}")
     int status(@Param("id") UUID id,@Param("status") String status,@Param("error") String error);
+    @Update("UPDATE documents SET status='failed',error=#{error},updated_at=now() WHERE id=#{id} AND status='processing'")
+    int failProcessing(@Param("id") UUID id,@Param("error") String error);
     @Select("SELECT pg_advisory_xact_lock(hashtextextended('researchrunner.embedding_profile',0))")
     String profileLock();
     @Select("SELECT row_to_json(p)::text FROM embedding_profiles p WHERE active=true FOR UPDATE")

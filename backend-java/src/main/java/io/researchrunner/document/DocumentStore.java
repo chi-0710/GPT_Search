@@ -42,7 +42,7 @@ public class DocumentStore {
     public void processing(UUID id) {
         if (mapper.status(id,"processing",null)==0) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"未找到文档");
     }
-    public void failed(UUID id,String error) { mapper.status(id,"failed",error.substring(0,Math.min(error.length(),10000))); }
+    public void failed(UUID id,String error) { mapper.failProcessing(id,error.substring(0,Math.min(error.length(),10000))); }
 
     public JsonNode profile(String provider,String model,int dimensions) {
         if (dimensions<1) throw new IllegalArgumentException("向量维度必须为正数");
@@ -58,6 +58,10 @@ public class DocumentStore {
     }
 
     public void replace(UUID document,UUID profile,List<DocumentParser.Part> chunks,List<float[]> embeddings) {
+        mapper.profileLock();
+        String active=mapper.activeProfile();
+        if(active==null || !parse(active).path("id").asText().equals(profile.toString()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"向量配置已切换，旧索引任务不能覆盖新索引");
         JsonNode configuration=parse(mapper.profile(profile));
         int dimensions=configuration.path("dimensions").asInt();
         if (chunks.isEmpty() || chunks.size()!=embeddings.size()) throw new IllegalArgumentException("Chunk and embedding counts differ or are empty");

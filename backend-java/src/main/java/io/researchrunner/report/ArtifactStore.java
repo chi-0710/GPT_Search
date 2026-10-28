@@ -22,12 +22,15 @@ public class ArtifactStore {
         this.mapper=mapper;this.json=json;this.limit=Math.multiplyExact(megabytes,1024L*1024L);
     }
     public JsonNode save(byte[] content,String filename,String kind,String mime,String report,UUID run,String legacy,Map<String,Object> metadata) {
+        return saveWithId(UUID.randomUUID(),content,filename,kind,mime,report,run,legacy,metadata);
+    }
+    public JsonNode saveWithId(UUID id,byte[] content,String filename,String kind,String mime,String report,UUID run,String legacy,Map<String,Object> metadata) {
         if(content.length>limit) throw new IllegalArgumentException("附件超过大小限制");
         String name=DocumentStore.safeName(filename);
         if(name.isEmpty()) name="artifact.bin";
         String path=legacy==null||legacy.isEmpty()?null:legacy.replace('\\','/').strip().replaceAll("^/+","").replaceAll("/+","/");
         if(path!=null) path=path.replaceAll("(^|/)\\./","$1").replaceAll("/$","");
-        String result=mapper.save(UUID.randomUUID(),report,run,kind,name,mime==null?"application/octet-stream":mime,
+        String result=mapper.save(id,report,run,kind,name,mime==null?"application/octet-stream":mime,
                 content.length,DocumentStore.hash(content),content,path,json.valueToTree(metadata==null?Map.of():metadata).toString());
         try{return json.readTree(result);}catch(java.io.IOException e){throw new IllegalStateException(e);}
     }

@@ -47,7 +47,12 @@ public class ResearchExecutionService {
         String mode=ReportMode.normalize(Objects.toString(request.getOrDefault("report_type","multi_agents")));
         String tone=Objects.toString(request.getOrDefault("tone","Objective"));
         if(query.isBlank() || !Set.of("web","local","hybrid").contains(source))throw invalid("研究问题或来源无效");
-        if(Boolean.TRUE.equals(request.get("mcp_enabled")) || !list(request,"mcp_configs").isEmpty() || !list(request,"document_urls").isEmpty())throw invalid("此 Java 研究入口尚不支持 MCP 或远程文档 URL");
+        if(!list(request,"document_urls").isEmpty())throw invalid("此 Java 研究入口尚不支持远程文档 URL");
+        var mcpConfigs=McpResearch.parse(list(request,"mcp_configs"),env);
+        if(Boolean.TRUE.equals(request.get("mcp_enabled")) && mcpConfigs.isEmpty())throw invalid("启用 MCP 必须提供服务器配置");
+        if(!mcpConfigs.isEmpty() && (source.equals("local") || !strings(request,"query_domains").isEmpty() || !strings(request,"source_urls").isEmpty()))
+            throw invalid("MCP 暂不支持文件限定或 URL/域名限定研究，禁止扩大来源范围");
+        if(!mcpConfigs.isEmpty() && !Objects.toString(request.getOrDefault("mcp_strategy","fast")).equals("fast"))throw invalid("当前 MCP 仅支持 fast 策略");
         if(request.get("headers") instanceof Map<?,?> headers && !headers.isEmpty())throw invalid("此入口尚不支持请求级模型配置覆盖");
         if(!env.getProperty("LLM_KWARGS","{}").strip().equals("{}"))throw invalid("此入口尚不支持 LLM_KWARGS");
         if(env.getProperty("IMAGE_GENERATION_ENABLED",Boolean.class,false))throw invalid("此入口尚不支持生成图片");
@@ -62,14 +67,16 @@ public class ResearchExecutionService {
         }
         int limit=request.get("max_search_results") instanceof Number n?n.intValue():env.getProperty("MAX_SEARCH_RESULTS_PER_QUERY",Integer.class,5);
         var selection=new SourceCollector.Selection(source,scope,strings(request,"query_domains"),strings(request,"source_urls"),limit);
-        if(!source.equals("local") && !env.getProperty("RETRIEVER","tavily").equals("tavily"))throw invalid("此研究入口尚只接入 Tavily 检索器");
+        String retriever=env.getProperty("RETRIEVER","tavily");
+        if(!source.equals("local") && (!Set.of("tavily","mcp").contains(retriever) || (retriever.equals("mcp") && mcpConfigs.isEmpty())))throw invalid("研究检索器未接入或 MCP 配置为空");
         var usage=new UsageLedger();var model=new SpringResearchModel(binding("FAST",6000),binding("SMART",12000),binding("STRATEGIC",8000),usage,json);
         Map<String,Object> options=new LinkedHashMap<>(request);options.put("resolved_document_ids",scope.stream().map(UUID::toString).toList());
         options.put("execution_backend","java");
+        options.put("mcp_configs",mcpConfigs.stream().map(c->Map.of("name",c.name(),"transport",c.transport())).toList());
         var run=connection.create(()->runs.create(query,mode,source,tone,options));
         active.add(connection);
         Callable<Map<String,Object>> work=()->{
-            try{return execute(run,query,tone,selection,model,usage,optionsConfig,connection);}
+            try{return execute(run,query,tone,selection,model,usage,optionsConfig,connection,mcpConfigs);}
             finally{active.remove(connection);}
         };
         if(!Boolean.FALSE.equals(request.get("generate_in_background"))) {
@@ -84,28 +91,31 @@ public class ResearchExecutionService {
         }
         return work.call();
     }
-    private Map<String,Object> execute(RunStore.Identity run,String query,String tone,SourceCollector.Selection selection,ResearchNodes.Model model,UsageLedger usage,ResearchOptions options,ResearchConnection connection) throws Exception {
-        try {
+    private Map<String,Object> execute(RunStore.Identity run,String query,String tone,SourceCollector.Selection selection,ResearchNodes.Model model,UsageLedger usage,ResearchOptions options,ResearchConnection connection,List<McpResearch.Config> mcpConfigs) throws Exception {
+        try(var mcp=mcpConfigs.isEmpty()?null:new McpResearch(json,Duration.ofSeconds(60),mcpRoots())) {
+            if(mcp!=null)connection.call(()->{mcp.connect(mcpConfigs);return null;});
             var evidence=new EvidenceRegistry(run.runId());
+            ResearchNodes.Model cancellableModel=(stage,instruction,input)->connection.call(()->model.generate(stage,instruction,input));
             var search=new TavilySearch(HttpClient.newHttpClient(),URI.create("https://api.tavily.com/search"),env.getProperty("TAVILY_API_KEY"),json,Duration.ofSeconds(100));
             var scraper=new WebScraper(Duration.ofSeconds(60),8*1024*1024);
             var sources=new SourceCollector(selection,
                     (q,ids)->connection.call(()->documents.retrieve(q,ids)),
-                    (q,domains,limit)->connection.call(()->search.search(q,domains,limit)),
-                    (url,domains)->connection.call(()->scraper.fetch(url,domains)),evidence);
+                    (q,domains,limit)->env.getProperty("RETRIEVER","tavily").equals("mcp")?List.of():connection.call(()->search.search(q,domains,limit)),
+                    (url,domains)->connection.call(()->scraper.fetch(url,domains)),evidence,
+                    mcp==null?null:q->connection.call(()->mcp.collect(q,cancellableModel)));
             var paths=new LinkedHashMap<String,String>();
             var settings=options.nodes();
-            ResearchNodes.Model cancellableModel=(stage,instruction,input)->connection.call(()->model.generate(stage,instruction,input));
             ResearchNodes.Progress progress=(stage,message)->connection.emit(Map.of("type","logs","content",stage,"output",message));
             ResearchNodes.Human human=options.humanReview()?connection.human():(title,sections,round)->{
                 progress.emit("human_review_skipped","未启用人工审核");return new ResearchNodes.Decision(true,"");
             };
+            var figures=new ArrayList<io.researchrunner.report.ReportFigure>();
             ResearchNodes.Visualizer visualizer=env.getProperty("JAVA_VISUALIZATION_ENABLED",Boolean.class,true)
-                    ?new ResearchVisualization(cancellableModel,evidence,progress)
+                    ?new ResearchVisualization(cancellableModel,evidence,progress,run.runId(),figures::add,env.getProperty("PUBLIC_API_URL","http://localhost:8000"))
                     :markdown->{progress.emit("visualization_skipped","配置已禁用可视化");return markdown;};
             var nodes=new ResearchNodes(settings,sources,evidence,cancellableModel,human,visualizer,
                     (markdown,snapshots,warnings)->{
-                        paths.putAll(connection.publish(publication,new ResearchResult(markdown,snapshots,usage.snapshot(),snapshots,warnings),options.pdf(),options.docx()));
+                        paths.putAll(connection.publish(publication,new ResearchResult(markdown,snapshots,usage.snapshot(),snapshots,warnings),options.pdf(),options.docx(),figures));
                     },progress,connection::cancelled);
             connection.emit(Map.of("type","research_started","content","research_started","run_id",run.runId(),"research_id",run.researchId(),"output",run.researchId()));
             var result=connection.call(()->ResearchWorkflow.compile(nodes.actions(),options.planLimit(),options.factLimit()).invoke(GraphInput.noArgs(),RunnableConfig.empty()).orElseThrow());
@@ -120,6 +130,11 @@ public class ResearchExecutionService {
         }
     }
     private SpringResearchModel.Binding binding(String role,int tokens) {return new ConfiguredChatModels(env).binding(role,tokens);}
+    private List<java.nio.file.Path> mcpRoots() throws java.io.IOException {
+        List<java.nio.file.Path> roots=new ArrayList<>();
+        for(String root:env.getProperty("JAVA_MCP_ALLOWED_ROOTS","").split(";"))if(!root.isBlank())roots.add(java.nio.file.Path.of(root).toRealPath());
+        return roots;
+    }
     private static List<?> list(Map<String,Object> request,String key){return request.get(key) instanceof List<?> values?values:List.of();}
     private static List<String> strings(Map<String,Object> request,String key){return list(request,key).stream().map(Object::toString).toList();}
     private static ResponseStatusException invalid(String detail){return new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,detail);}

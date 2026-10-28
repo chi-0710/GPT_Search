@@ -20,8 +20,11 @@ public class ReportExports {
     @Transactional(rollbackFor=Exception.class)
     public Map<String,String> save(String report,UUID run,String markdown,boolean pdf,boolean docx) throws Exception {
         String exported=markdown.replaceAll("\\]\\((/api/research-runs/[0-9a-fA-F-]{36}/evidence/\\d+/view)\\)",java.util.regex.Matcher.quoteReplacement("]("+origin)+"$1)");
+        // Only our configured public origin may resolve to local image bytes; never fetch remote URLs.
+        exported=exported.replaceAll("!\\[([^\\]]*)\\]\\("+java.util.regex.Pattern.quote(origin)+"(/api/artifacts/[0-9a-fA-F-]{36})\\)","![$1]($2)");
         var renderer=new ReportRenderer(id->{var file=resources.artifact(id);return file==null?null:file.content();});
-        Map<String,byte[]> bytes=new LinkedHashMap<>();bytes.put("md",exported.getBytes(StandardCharsets.UTF_8));
+        String portable=exported.replaceAll("\\]\\((/api/artifacts/[0-9a-fA-F-]{36})\\)",java.util.regex.Matcher.quoteReplacement("]("+origin)+"$1)");
+        Map<String,byte[]> bytes=new LinkedHashMap<>();bytes.put("md",portable.getBytes(StandardCharsets.UTF_8));
         if(docx)bytes.put("docx",renderer.docx(exported));if(pdf)bytes.put("pdf",renderer.pdf(exported));
         Map<String,String> paths=new LinkedHashMap<>();
         for(var entry:bytes.entrySet()) {

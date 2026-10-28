@@ -12,12 +12,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResearchPublication {
     private final RunStore runs;
     private final ReportExports exports;
-    public ResearchPublication(RunStore runs,ReportExports exports) {this.runs=runs;this.exports=exports;}
+    private final io.researchrunner.report.ArtifactStore artifacts;
+    public ResearchPublication(RunStore runs,ReportExports exports) {this(runs,exports,null);}
+    @org.springframework.beans.factory.annotation.Autowired
+    public ResearchPublication(RunStore runs,ReportExports exports,io.researchrunner.report.ArtifactStore artifacts) {this.runs=runs;this.exports=exports;this.artifacts=artifacts;}
 
     @Transactional(rollbackFor=Exception.class)
     public Map<String,String> publish(RunStore.Identity run,ResearchResult result,boolean pdf,boolean docx) throws Exception {
+        return publish(run,result,pdf,docx,java.util.List.of());
+    }
+    @Transactional(rollbackFor=Exception.class)
+    public Map<String,String> publish(RunStore.Identity run,ResearchResult result,boolean pdf,boolean docx,
+            java.util.List<io.researchrunner.report.ReportFigure> figures) throws Exception {
         // Acquire the same run row lock used by terminal transitions before creating attachments.
         runs.append(run.runId(),Map.of("type","logs","content","publishing","output","正在保存研究报告"));
+        for(var figure:figures) {
+            if(artifacts==null)throw new IllegalStateException("图片附件服务不可用");
+            artifacts.saveWithId(figure.id(),figure.png(),figure.filename(),"image","image/png",run.researchId(),run.runId(),
+                    "outputs/"+figure.filename(),Map.of("generator","java-flowchart"));
+        }
         var paths=exports.save(run.researchId(),run.runId(),result.report(),pdf,docx);
         for(String warning:result.warnings()) runs.append(run.runId(),Map.of("type","logs","content","warning","output",warning));
         runs.append(run.runId(),Map.of("type","report_complete","output",result.report()));

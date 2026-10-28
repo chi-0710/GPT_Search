@@ -4,6 +4,8 @@ server:
     include-message: never
     include-stacktrace: never
 spring:
+  flyway:
+    enabled: false # Migration is an explicit Java CLI operation, never automatic baselining.
   servlet:
     multipart:
       max-file-size: ${MAX_BLOB_SIZE_MB:50}MB

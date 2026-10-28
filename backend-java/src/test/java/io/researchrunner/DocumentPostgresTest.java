@@ -26,6 +26,27 @@ import static org.mockito.Mockito.*;
 class DocumentPostgresTest {
     @Autowired io.researchrunner.report.ReportExports exports;
     @Autowired io.researchrunner.research.RunStore runs;
+    @Autowired io.researchrunner.research.ResearchPublication publication;
+    @Test void figurePublishesWithReportAndEmbedsIntoPdfAndDocx() throws Exception {
+        var run=runs.create("图表测试","multi_agents","web","Objective",Map.of());
+        byte[] png=new io.researchrunner.report.FlowchartRenderer().png("flowchart TD\nA[证据] --> B[报告]");
+        UUID image=UUID.randomUUID();
+        var figure=new io.researchrunner.report.ReportFigure(image,run.runId()+"-figure.png",png);
+        var result=new io.researchrunner.research.ResearchResult("# 图表报告\n\n![流程](http://localhost:8000/api/artifacts/"+image+")",
+                List.of(),Map.of(),List.of(Map.of("number",1,"content","证据")),List.of());
+        var paths=publication.publish(run,result,true,true,List.of(figure));
+        assertArrayEquals(png,http.getForObject("/api/artifacts/"+image,byte[].class));
+        assertTrue(new String(http.getForObject(paths.get("md"),byte[].class),StandardCharsets.UTF_8).contains("http://localhost:8000/api/artifacts/"+image));
+        try(var document=new org.apache.poi.xwpf.usermodel.XWPFDocument(new java.io.ByteArrayInputStream(http.getForObject(paths.get("docx"),byte[].class)))) {
+            assertEquals(1,document.getAllPictures().size());
+        }
+        try(var pdf=org.apache.pdfbox.Loader.loadPDF(http.getForObject(paths.get("pdf"),byte[].class))) {
+            boolean found=false;
+            for(var page:pdf.getPages())for(var name:page.getResources().getXObjectNames())
+                if(page.getResources().getXObject(name) instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject)found=true;
+            assertTrue(found);
+        }
+    }
     @Test void exportsPersistRealFilesAndReuseArtifactIdentity() throws Exception {
         var run=runs.create("导出测试","multi_agents","web","Objective",Map.of());
         var first=exports.save(run.researchId(),run.runId(),"# 中文报告\n\n证据内容",true,true);

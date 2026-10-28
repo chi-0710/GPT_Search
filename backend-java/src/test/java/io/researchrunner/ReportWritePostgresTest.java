@@ -83,12 +83,14 @@ class ReportWritePostgresTest {
         }
     }
 
-    @Test void publicationRollsBackArtifactsEventsAndEvidenceOnCompletionFailure() {
+    @Test void publicationRollsBackArtifactsEventsAndEvidenceOnCompletionFailure() throws Exception {
         var run=runs.create("publication rollback","multi_agents","web","Objective",Map.of());
         var duplicate=Map.<String,Object>of("number",1,"content","evidence");
         var result=new io.researchrunner.research.ResearchResult("正文",java.util.List.of(),Map.of(),
                 java.util.List.of(duplicate,duplicate),java.util.List.of());
-        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->publication.publish(run,result,false,false));
+        var figure=new io.researchrunner.report.ReportFigure(UUID.randomUUID(),run.runId()+"-figure.png",
+                new io.researchrunner.report.FlowchartRenderer().png("flowchart TD\nA[证据] --> B[报告]"));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->publication.publish(run,result,false,false,java.util.List.of(figure)));
         for(String table:java.util.List.of("artifacts","research_events","research_evidence")) {
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE run_id=?",Integer.class,run.runId()));
         }

@@ -23,7 +23,7 @@ class HistoryControllerTest {
         mapper = mock(HistoryMapper.class);
         mvc = MockMvcBuilders.standaloneSetup(
                 new HistoryController(new HistoryService(mapper, new ObjectMapper())),
-                new ReadinessController(mapper, "0002_shared_library"))
+                new ReadinessController(mapper, "0002_shared_library",false,"1"))
                 .setControllerAdvice(new ApiErrors()).build();
     }
 
@@ -86,6 +86,22 @@ class HistoryControllerTest {
         mvc.perform(get("/health/ready")).andExpect(status().isOk()).andExpect(jsonPath("$.ready").value(true));
         when(mapper.vectorEnabled()).thenReturn(false);
         mvc.perform(get("/health/ready")).andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void requiredFlywayRejectsMissingFailedAndUnexpectedVersions() {
+        when(mapper.vectorEnabled()).thenReturn(true);
+        when(mapper.migrationTableExists()).thenReturn(true);
+        when(mapper.migrationVersion()).thenReturn("0002_shared_library");
+        var controller=new ReadinessController(mapper,"0002_shared_library",true,"1");
+        org.junit.jupiter.api.Assertions.assertEquals(503,controller.ready().getStatusCode().value());
+        when(mapper.flywayTableExists()).thenReturn(true);
+        when(mapper.flywayVersion()).thenReturn("1");
+        org.junit.jupiter.api.Assertions.assertEquals(503,controller.ready().getStatusCode().value());
+        when(mapper.flywayHealthy()).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertEquals(200,controller.ready().getStatusCode().value());
+        when(mapper.flywayVersion()).thenReturn("2");
+        org.junit.jupiter.api.Assertions.assertEquals(503,controller.ready().getStatusCode().value());
     }
 
     @Test

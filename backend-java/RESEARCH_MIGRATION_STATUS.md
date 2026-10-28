@@ -11,7 +11,7 @@
 - `task_options` 支持 `max_sections`（默认 3）、三个 `max_*_revisions`（默认 3，null 为不设业务修订上限）、`include_human_feedback`、`follow_guidelines`、`guidelines`。同名顶层字段覆盖 task_options；非法值及不支持的嵌套配置明确拒绝。
 - HTTP 无人工审核通道，显式要求人工审核时返回错误；不再暗中接受。未启用时产生跳过事件。
 - 指南传入模型和章节审阅；章节草稿仅作为日志进度发送，最终规范报告通过 report_complete 发布一次。
-- 可视化调用模型生成 Mermaid，传入真实证据，仅精确 None 表示无可视化数据；不执行模型生成的代码。此项还不是图表图片附件化或视觉验收完成。
+- 可视化调用模型生成受限 Mermaid 流程图，使用真实证据；Java 渲染 PNG 并作为数据库附件随报告原子提交。仅精确 None 表示无可视化数据。不执行模型代码，不支持任意 Mermaid 图型。
 - ResearchPublication 将报告终态、证据、导出附件、最终事件放入同一事务。失败回滚整批写入。
 - 取消和发布共用运行锁；断线取消人工等待、排队任务和已登记的外部调用，章节协调器取消并等待兄弟任务。断线最多等待 15 秒清理，超时会记录警告；尚未证明所有供应商都支持立即中断网络请求。
 - 取消的运行保存 cancelled；兼容旧库 reports 状态约束，报告保存 failed，具体原因保留在运行记录。
@@ -23,7 +23,11 @@
 | JAVA_SECTION_CONCURRENCY | 3 | 并行章节数 |
 | JAVA_LOCAL_CONTEXT_BUDGET | 10000 | 文件证据上下文预算 |
 | JAVA_WEB_CONTEXT_BUDGET | 10000 | 网络证据上下文预算 |
-| JAVA_VISUALIZATION_ENABLED | true | 运行原有 Mermaid 可视化节点；false 产生明确跳过事件 |
+| JAVA_VISUALIZATION_ENABLED | true | 将受限 Mermaid 流程图渲染为 PNG 附件；false 明确跳过 |
+| JAVA_REQUIRE_FLYWAY | false | 正式 Java 部署应为 true，就绪检查要求 Java 迁移记录 |
+| JAVA_EXPECTED_MIGRATION | 1 | 当前 Java 迁移版本 |
+| JAVA_MCP_ALLOWED_COMMANDS | 空 | 可启动的非 Python MCP 程序完整命令名，逗号分隔 |
+| JAVA_MCP_ALLOWED_ROOTS | 空 | MCP 文件参数可访问的既有目录，分号分隔 |
 
 请求 `export_pdf`、`export_docx` 默认 true。以上配置尚未进入默认 Compose；正式切换时必须补齐环境映射，不能只写根目录 .env。
 
@@ -39,18 +43,19 @@
 
 - 完整浏览器研究与人工审核、真实供应商六次预算内验收尚未执行。
 - HTTP/WebSocket 报告聊天和搜索工具已接入；浏览器真实供应商聊天尚未验收。
-- MCP、远程文档 URL、请求级模型覆盖、LLM_KWARGS、图片生成与全部供应商适配尚未完成。
-- Mermaid 图表尚未渲染为数据库图片附件；PDF/DOCX 图表视觉呈现未验收。
-- 中断任务恢复已实现为显式单写入者启动选项；资料批量重建与嵌入模型切换尚未完成。
-- Java CLI 已实现参数解析及共享执行入口，完整真实研究未验收；Flyway 接管、完整协议矩阵和默认 Java Compose/CI 尚未完成。
-- 数据库备份恢复、默认入口切换、Python 回滚演练和无 Python 验收尚未执行。
+- MCP stdio 与 Streamable HTTP 的连接、鉴权、发现、选择、调用、超时、取消及清理已接入并通过离线协议测试；WebSocket 传输及 fast 之外的策略未迁移，文件/域名限定研究与 MCP 组合明确拒绝。
+- 远程文档 URL、请求级模型覆盖、LLM_KWARGS、图片供应商与全部供应商适配尚未完成。现有 OpenAI 兼容地址映射不计为完整供应商验收。
+- PNG 流程图实际预览通过；真实 PostgreSQL 验证图片下载及 PDF/DOCX 嵌入。完整 PDF/DOCX 图表视觉验收未完成。
+- 资料批量重建与嵌入模型切换已接入 Java CLI，真实 PostgreSQL 验证成功、准备失败、事务失败与并发资料变化；大资料库内存/性能验收未执行。
+- Flyway 空库建表与严格旧库基线、重复执行已通过；真实应用库接管、完整协议矩阵和默认 Java Compose/CI 未完成。
+- 隔离 Java 建库与备份恢复通过；实际业务库备份恢复、默认入口切换、Python 回滚演练和默认部署无 Python 验收仍未通过。
 
 ## 数据与提交约束
 
 默认服务继续运行 Python，Java 写入仅用于隔离测试；不得把当前阶段描述为全面替代。
 Python 源码及测试在所有验收门槛通过后才删除。历史报告、资料、附件、实验结果与 PostgreSQL 卷必须保留。
 前端文件包含既有未提交改动，当前兼容修正保留在工作区，不能将整文件的其他改动混入本批 Java 提交。
-真实 DeepSeek/DashScope/Tavily 研究调用额度本批使用 0 次，剩余总预算 6 次，每次最多 2 章，关闭付费图片生成。
+真实研究预算累计使用 1/6 次：web 初始 Tavily 搜索发生 TLS 握手失败，未生成报告。无凭据连通性检查确认 DashScope 也存在 TLS 问题；DeepSeek 根地址可达不等于真实模型通过。暂停其余实测，不扩大预算。记录见 `acceptance/live-runs.json`。
 
 ## 后续批次：聊天、CLI 和中断恢复
 
@@ -64,3 +69,16 @@ Python 源码及测试在所有验收门槛通过后才删除。历史报告、�
 - CLI 兼容 query、report_type、tone、encoding、query_domains、report_source、no-pdf、no-docx；encoding 与旧 CLI 的持久化路径一致，附件 Markdown 始终 UTF-8。CLI 无 HTTP 监听端口。
 - `JAVA_RECOVER_INTERRUPTED_TASKS=true` 仅在停止旧写入者后启用，默认关闭。启动前将带 execution_backend=java 的未结束运行标为失败，将遗留 processing 文档标为失败，保留文件和已有向量，不重跑收费研究。早期未带标记的 Java 运行须人工核对归属，不自动误判 Python 运行。
 - 修复写入模式下 CORS 只允许 GET 的问题，浏览器可发起 POST/PUT/DELETE 预检；只读模式保留 GET/OPTIONS。
+
+## 当前批次：Flyway、MCP、索引切换和图表附件
+
+2026-10-28：本批 `scripts/test_java_migration.ps1 -JavaOnly` 已有 132 项通过及隔离备份恢复通过记录；测试以打包后的 Java CLI 从空 PostgreSQL 建库，对恢复后的报告、聊天、文档、向量、附件、证据和嵌入配置逐表比对内容摘要。后续复验暴露 MCP 测试进程启动期限过短，修正并增强在途取消检查后，最新完整旧 Alembic 库对照 `scripts/test_java_migration.ps1` 再次 132 项通过，0 失败、0 错误、0 跳过（`target/legacy-release.log`）。此结果不代表默认业务部署已替换。
+
+- Flyway 采用显式 `migrate` 命令，禁用启动时自动迁移和自动基线；已有数据库必须携带 `--baseline-existing`，并匹配 Alembic 版本及冻结的列、约束、索引结构。保留 Alembic 记录；不执行 clean/repair。
+- MCP 使用官方 Java SDK 0.18.4；仅工具返回内容进入证据注册表，模型选工具的文本不作为证据。连接配置持久化时只保存名称和传输类型，移除凭据。
+- MCP 测试实际启动 Java stdio 夹具进程，并通过真实本地 HTTP 服务检查鉴权与协议；超时、取消后检查进程退出。这些不是外部 MCP 服务实测。
+- 索引准备在事务外执行；所有向量准备后锁定资料、重新检查快照，在同一事务内替换向量、构建并验证新 HNSW 索引、切换 active profile。任何失败保留旧索引与资料。过期索引任务不能写入已停用的 profile。
+- 流程图 PNG、Markdown、中文 PDF、DOCX 与最终证据和报告终态共用发布事务。导出渲染只从附件服务读图，不下载任意远程图片。公开图片 URL 使用 PUBLIC_API_URL，避免浏览器端口与内部服务地址混淆。
+- 可复用真实验收脚本 `scripts/test_java_live.ps1` 使用独立 tmpfs 数据库、记录六次预算、保留结果与测试库备份；每次最多两章，禁用付费图片。当前只执行一次，失败后没有自动重试。
+
+操作命令与切换约束见 `OPERATIONS.md`。`acceptance/provider-status.json` 逐项记录全部 78 类供应商的实现、协议与真实调用状态（27 聊天、21 嵌入、21 检索、7 抓取、2 图片）。尚未迁移的供应商范围没有因本批测试通过而减少；禁止将本批称为“全部供应商完成”或“默认部署验收完成”。

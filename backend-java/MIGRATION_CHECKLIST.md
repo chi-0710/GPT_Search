@@ -1,5 +1,7 @@
 # 全 Java 迁移验收清单
 
+当前状态以 [RESEARCH_MIGRATION_STATUS.md](RESEARCH_MIGRATION_STATUS.md) 为准；本文保留各批历史记录，早期“尚未完成”及测试数量不代表最新状态。2026-10-28 新增 Flyway、MCP 客户端、原子索引切换和图表附件；默认部署与全部供应商仍未完成。
+
 分支：`codex/java-backend-migration`。前端入口继续使用 Python，直至下面所有切换门槛通过。
 
 ## 已锁定的约束

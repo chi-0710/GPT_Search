@@ -51,8 +51,12 @@ public final class ResearchConnection implements AutoCloseable {
         events.send(event);
     }
     public synchronized Map<String,String> publish(ResearchPublication publisher,ResearchResult result,boolean pdf,boolean docx) throws Exception {
+        return publish(publisher,result,pdf,docx,java.util.List.of());
+    }
+    public synchronized Map<String,String> publish(ResearchPublication publisher,ResearchResult result,boolean pdf,boolean docx,
+            java.util.List<io.researchrunner.report.ReportFigure> figures) throws Exception {
         if(cancelled)throw new CancellationException();
-        var paths=publisher.publish(run,result,pdf,docx);
+        var paths=figures.isEmpty()?publisher.publish(run,result,pdf,docx):publisher.publish(run,result,pdf,docx,figures);
         finished=true;
         // Publication is committed before transport delivery. A delivery failure cannot undo it.
         try {events.send(Map.of("type","report_complete","output",result.report()));events.send(Map.of("type","path","output",paths));}

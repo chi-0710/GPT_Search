@@ -63,4 +63,10 @@ public interface HistoryMapper {
 
     @Select("SELECT version_num FROM alembic_version ORDER BY version_num DESC LIMIT 1")
     String migrationVersion();
+    @Select("SELECT to_regclass('public.flyway_schema_history') IS NOT NULL")
+    boolean flywayTableExists();
+    @Select("SELECT version FROM public.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1")
+    String flywayVersion();
+    @Select("SELECT NOT EXISTS(SELECT 1 FROM public.flyway_schema_history WHERE NOT success)")
+    boolean flywayHealthy();
 }
