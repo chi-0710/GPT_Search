@@ -14,13 +14,27 @@ import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 
 /** JVM report rendering. Raw HTML is escaped and rendering does not fetch external resources. */
 public final class ReportRenderer {
+    private final java.util.function.Function<java.util.UUID,byte[]> images;
+    public ReportRenderer() { this(id->null); }
+    public ReportRenderer(java.util.function.Function<java.util.UUID,byte[]> images) {this.images=images;}
     private org.jsoup.nodes.Document html(String markdown) {
         var extensions=List.of(TablesExtension.create());
         var parser=Parser.builder().extensions(extensions).build();
         String html=HtmlRenderer.builder().extensions(extensions).escapeHtml(true).sanitizeUrls(true).build().render(parser.parse(markdown));
         var document=Jsoup.parse(html);
-        // Images require a persisted-artifact resolver; never fetch arbitrary model-produced URLs.
-        for(var image:document.select("img")) image.replaceWith(new TextNode("[图片："+image.attr("alt")+"]"));
+        for(var image:document.select("img")) {
+            String source=image.attr("src");
+            if(!source.matches("/api/artifacts/[0-9a-fA-F-]{36}"))throw new IllegalArgumentException("导出图片必须使用已保存的附件");
+            byte[] bytes=images.apply(java.util.UUID.fromString(source.substring(source.lastIndexOf('/')+1)));
+            if(bytes==null)throw new IllegalArgumentException("导出图片不存在");
+            try {
+                var decoded=javax.imageio.ImageIO.read(new ByteArrayInputStream(bytes));
+                if(decoded==null)throw new IllegalArgumentException("导出图片格式无效");
+                var png=new ByteArrayOutputStream();javax.imageio.ImageIO.write(decoded,"png",png);
+                image.attr("src","data:image/png;base64,"+java.util.Base64.getEncoder().encodeToString(png.toByteArray()));
+                image.attr("width",Integer.toString(Math.min(500,decoded.getWidth())));
+            } catch(IOException e){throw new IllegalArgumentException("无法读取导出图片",e);}
+        }
         return document;
     }
 
@@ -55,6 +69,14 @@ public final class ReportRenderer {
             run.setBold(bold);run.setItalic(italic);run.setText(text.getWholeText());return;
         }
         if(node instanceof Element element) {
+            if(element.tagName().equals("img")) {
+                byte[] bytes=java.util.Base64.getDecoder().decode(element.attr("src").split(",",2)[1]);
+                try {
+                    var picture=javax.imageio.ImageIO.read(new ByteArrayInputStream(bytes));
+                    int width=Math.min(500,picture.getWidth());int height=Math.max(1,(int)((long)picture.getHeight()*width/picture.getWidth()));
+                    paragraph.createRun().addPicture(new ByteArrayInputStream(bytes),Document.PICTURE_TYPE_PNG,"image.png",org.apache.poi.util.Units.toEMU(width),org.apache.poi.util.Units.toEMU(height));
+                } catch(Exception e){throw new IllegalStateException("无法嵌入图片",e);}return;
+            }
             if(element.tagName().equals("br")){paragraph.createRun().addBreak();return;}
             if(element.tagName().equals("a")) {
                 String target=element.attr("href");

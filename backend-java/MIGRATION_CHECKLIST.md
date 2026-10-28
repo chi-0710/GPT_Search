@@ -109,6 +109,16 @@ CompatibleModelFactory 是 OpenAI 兼容协议适配基础，不代表 11 家已
 
 ## 回滚执行约束
 
+## 2026-10-28 图片、导出与研究 HTTP 接入
+
+- ReportRenderer 支持数据库附件 PNG/JPEG 等可解码图片，统一转为 PNG 后嵌入 PDF/DOCX；拒绝任意外部图片 URL。
+- ReportExports 生成三种导出格式后在事务内保存附件，使用运行 ID 作为稳定旧路径，重复保存复用附件身份；导出中的资料引用使用 PUBLIC_API_URL。
+- 新增 `/report/` 同步/后台研究与 `/api/multi_agents` 默认研究入口，均受 JAVA_WRITES_ENABLED 控制。文件研究接入 DocumentIndex/EmbeddingGateway，冻结资料范围，执行真实研究图并调用导出和完成保存。
+- HTTP 入口当前只装配 Tavily 与兼容模型；明确拒绝 MCP、远程文档 URL、请求级 headers、非空 LLM_KWARGS、图片生成。WebSocket 尚未迁移，不能据此切换现有前端。
+- 最终隔离 Maven verify：94 项全部通过，无失败、错误或跳过，含 18 项真实 PostgreSQL 测试；真实导出字节入库、下载、重复导出身份复用均通过。研究接口调用链测试使用本地模型 HTTP 模拟与持久化替身，尚未进行真实供应商研究验收。
+
+## 切换保护
+
 切换时沿用原 `gpt-researcher` 服务地址与 8000 端口，前端仍为 3800。
 切换失败先停止 Java 写入，再启动保留的 Python 镜像。优先复用兼容数据，不覆盖切换后新数据。
 禁止 `docker compose down -v`、清理应用卷、自动放宽资料范围或故障后换用另一研究实现。

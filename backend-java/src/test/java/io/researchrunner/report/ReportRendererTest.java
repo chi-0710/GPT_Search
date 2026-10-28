@@ -8,6 +8,15 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ReportRendererTest {
+    @Test void embedsStoredImageInBothFormatsAndRejectsExternalImage() throws Exception {
+        var pixels=new java.awt.image.BufferedImage(20,10,java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var buffer=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(pixels,"png",buffer);
+        var renderer=new ReportRenderer(id->buffer.toByteArray());
+        String markdown="![图示](/api/artifacts/"+java.util.UUID.randomUUID()+")";
+        try(var docx=new XWPFDocument(new ByteArrayInputStream(renderer.docx(markdown)))){assertEquals(1,docx.getAllPictures().size());}
+        try(var pdf=Loader.loadPDF(renderer.pdf(markdown))){assertTrue(pdf.getPage(0).getResources().getXObjectNames().iterator().hasNext());}
+        assertThrows(IllegalArgumentException.class,()->renderer.pdf("![外部](https://example.com/image.png)"));
+    }
     private final String markdown="# 知行研究助手\n\n中文研究正文与[来源](https://example.com)。\n\n| 项目 | 结果 |\n| --- | --- |\n| 资料 | 通过 |\n";
     @Test void docxPreservesChineseTablesAndHyperlinks() throws Exception {
         try(var document=new XWPFDocument(new ByteArrayInputStream(new ReportRenderer().docx(markdown)))) {

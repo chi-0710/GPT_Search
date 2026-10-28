@@ -24,6 +24,18 @@ import static org.mockito.Mockito.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
 @EnabledIfEnvironmentVariable(named="JAVA_WRITE_TEST_DATABASE_URL",matches=".+")
 class DocumentPostgresTest {
+    @Autowired io.researchrunner.report.ReportExports exports;
+    @Autowired io.researchrunner.research.RunStore runs;
+    @Test void exportsPersistRealFilesAndReuseArtifactIdentity() throws Exception {
+        var run=runs.create("导出测试","multi_agents","web","Objective",Map.of());
+        var first=exports.save(run.researchId(),run.runId(),"# 中文报告\n\n证据内容",true,true);
+        var second=exports.save(run.researchId(),run.runId(),"# 中文报告\n\n更新内容",true,true);
+        assertEquals(first,second);
+        byte[] pdf=http.getForObject(second.get("pdf"),byte[].class);
+        try(var document=org.apache.pdfbox.Loader.loadPDF(pdf)) {
+            assertTrue(java.text.Normalizer.normalize(new org.apache.pdfbox.text.PDFTextStripper().getText(document),java.text.Normalizer.Form.NFKC).contains("更新内容"));
+        }
+    }
     @Autowired DocumentStore store;
     @Autowired DocumentIndex index;
     @Autowired ArtifactStore artifacts;
