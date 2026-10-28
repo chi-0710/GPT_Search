@@ -20,6 +20,8 @@ NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000
 
 修改环境变量后需要重新启动前端。
 
+后端默认是 Python 服务（8000）。如改为连接 Java 后端（8001），把地址改为 `http://127.0.0.1:8001` 即可；Java 后端默认只读，写入需要显式开启写开关，见 `backend-java/README.md`。
+
 ## 安装与启动
 
 所有 npm 命令都要在 `frontend/nextjs` 目录执行：

@@ -185,10 +185,10 @@ CLI 也需要 PostgreSQL 连接；保留现有数据库、卷名及模型供应�
 服务端不再回退 AG2，前端不再使用独立的 LangGraph 主机地址。删除的独立深度研究配置不再生效；MCP 的 `deep` 策略仍保留。
 升级后按现有流程重建应用服务，验证文件研究、报告保存与导出；不需要删除数据库卷。
 
-## Java 渐进迁移验证服务
+## Java 后端（可选）
 
-新增的 `backend-java/` 是独立的只读迁移验证服务，目前尚不能替代完整 Python 后端。
+`backend-java/` 是与 Python 后端共用同一数据库结构和 HTTP/WebSocket 契约的 Spring Boot 实现，包含完整研究图、读写接口、WebSocket 人工审核、聊天、CLI、MCP、文档索引与中文 PDF/DOCX 导出。
 使用额外的 `docker-compose.java.yml` 和 `java` profile 显式启用，默认本机端口为 8001。
 原前端 3800、Python API 8000、PostgreSQL 数据卷与 Alembic 迁移保持不变。
-不要将前端代理切换到 Java，也不要移除原 Python 服务。
-配置、构建和隔离数据库测试命令见 [Java 后端说明](backend-java/README.md)。
+Java 默认只读运行；写入需显式设置 `JAVA_WRITES_ENABLED=true` 和 `JAVA_DB_READ_ONLY=false`，并且同一时间只允许一个后端写入应用库。
+切换与回滚步骤见 [Java 运维说明](backend-java/OPERATIONS.md)，配置、构建和隔离数据库测试命令见 [Java 后端说明](backend-java/README.md)。

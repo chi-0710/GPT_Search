@@ -1,109 +1,83 @@
 > 当前实现：仅保留 LangGraph 多智能体报告，支持网络、文件和混合资料来源。旧报告模式请求自动转换；内部草稿格式继续保留。
 
-# LangGraph x ResearchRunner
-[LangGraph](https://python.langchain.com/docs/langgraph) is a library for building stateful, multi-actor applications with LLMs. 
-This example uses Langgraph to automate the process of an in depth research on any given topic.
+# LangGraph 多智能体研究（ResearchRunner）
 
+本目录是知行研究助手默认报告模式的 LangGraph 实现：由多个具备不同职责的智能体协作，对给定主题完成从规划到发布的研究流程。设计参考 [STORM](https://arxiv.org/abs/2402.14207) 的思路。
 
-## Use case
-By using Langgraph, the research process can be significantly improved in depth and quality by leveraging multiple agents with specialized skills. 
+## 智能体
 
-Inspired by the recent [STORM](https://arxiv.org/abs/2402.14207) paper, this example showcases how a team of AI agents can work together to conduct research on a given topic, from planning to publication.
+- **Human**：人工审核环节，可接受或提出修改意见
+- **Chief Editor**（`orchestrator.py`）：协调团队、编译并驱动 LangGraph 工作流
+- **Browser**（`agent.py` / `search` 初始研究）：针对主题进行初始资料收集
+- **Editor**（`editor.py`）：基于初始研究规划报告结构与章节
+- **Researcher**：并行开展各章节研究并产出草稿
+- **Reviewer**：按固定标准审阅章节草稿并给出意见
+- **Revisor**（`reviser.py`）：根据审阅意见修订草稿
+- **Writer**（`writer.py`）：汇总各章节并撰写最终报告
+- **Fact Checker**（`fact_checker.py`）：基于证据核查事实，失败时返回章节返修
+- **Visualizer**（`visualizer.py`）：生成受限的 Mermaid 流程图
+- **Publisher**（`publisher.py`）：组装最终 Markdown，导出由后端 artifact 服务统一完成
 
-An average run generates a 5-6 page research report in multiple formats such as PDF, Docx and Markdown.
+## 工作流程
 
-Please note: Multi-agents are utilizing the same configuration of models like ResearchRunner does. However, only the SMART_LLM is used for the time being. Please refer to the [LLM config pages](https://docs.gptr.dev/docs/gpt-researcher/llms).
+初始研究 → 规划 → 人工审核（可选）→ 章节并行研究/审核/修订 → 汇总写作 → 事实核查与章节返修 → 可视化 → 发布。
 
-## The Multi Agent Team
-The research team is made up of 8 agents:
-- **Human** - The human in the loop that oversees the process and provides feedback to the agents.
-- **Chief Editor** - Oversees the research process and manages the team. This is the "master" agent that coordinates the other agents using Langgraph.
-- **Researcher** (gpt-researcher) - A specialized autonomous agent that conducts in depth research on a given topic.
-- **Editor** - Responsible for planning the research outline and structure.
-- **Reviewer** - Validates the correctness of the research results given a set of criteria.
-- **Revisor** - Revises the research results based on the feedback from the reviewer.
-- **Writer** - Responsible for compiling and writing the final report.
-- **Publisher** - Responsible for publishing the final report in various formats.
+- 每个章节是独立的子图：researcher → reviewer ⇄ reviser。
+- 规划、章节与事实核查的返修均有上限，超限显式失败，不会强制接受未解决的审阅意见。
+- 一次运行会冻结资料范围，所有阶段共享同一套证据编号与引用链接。
+- 运行期依赖（模型、搜索、证据注册表、WebSocket）通过 `runtime.py` 传入，不进入可序列化的图状态。
 
-## How it works
-Generally, the process is based on the following stages: 
-1. Planning stage
-2. Data collection and analysis
-3. Review and revision
-4. Writing and submission
-5. Publication
+## 如何运行
 
-### Architecture
-<div align="center">
-<img align="center" height="600" src="https://github.com/user-attachments/assets/ef561295-05f4-40a8-a57d-8178be687b18">
-</div>
-<br clear="all"/>
+生产入口是后端与 CLI，而不是本目录的独立进程：
 
-### Steps
-More specifically (as seen in the architecture diagram) the process is as follows:
-- Browser (gpt-researcher) - Browses the internet for initial research based on the given research task.
-- Editor - Plans the report outline and structure based on the initial research.
-- For each outline topic (in parallel):
-  - Researcher (gpt-researcher) - Runs an in depth research on the subtopics and writes a draft.
-  - Reviewer - Validates the correctness of the draft given a set of criteria and provides feedback.
-  - Revisor - Revises the draft until it is satisfactory based on the reviewer feedback.
-- Writer - Compiles and writes the final report including an introduction, conclusion and references section from the given research findings.
-- Publisher - Publishes the final report to multi formats such as PDF, Docx, Markdown, etc.
+```powershell
+# 启动后端后由 HTTP/WebSocket 触发
+python -m uvicorn main:app --reload
 
-## How to run
-1. Install required packages found in this root folder including `langgraph`:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3. Update env variables, see the [ResearchRunner docs](https://docs.gptr.dev/docs/gpt-researcher/llms) for more details.
+# 或直接用 CLI 执行一次研究
+python cli.py "研究主题" --report_source hybrid
+```
 
-2. Run the application:
-    ```bash
-    python main.py
-    ```
+如需使用本目录的 `task.json` 调试，可执行：
 
-## Usage
-To change the research query and customize the report, edit the `task.json` file in the main directory.
-#### Task.json contains the following fields:
-- `query` - The research query or task.
-- `model` - The OpenAI LLM to use for the agents.
-- `max_sections` - The maximum number of sections in the report. Each section is a subtopic of the research query.
-- `max_plan_revisions` - The maximum number of human-requested plan revisions before the workflow exits with a clear error. Set to `null` to rely on LangGraph's recursion limit instead.
-- `include_human_feedback` - If true, the user can provide feedback to the agents. If false, the agents will work autonomously.
-- `source` - Research sources: `web`, `local`, or `hybrid`. Local research uses the PostgreSQL document library and the document scope frozen when the run starts.
-- `follow_guidelines` - If true, the research report will follow the guidelines below. It will take longer to complete. If false, the report will be generated faster but may not follow the guidelines.
-- `guidelines` - A list of guidelines that the report must follow.
-- `verbose` - If true, the application will print detailed logs to the console.
+```powershell
+python multi_agents/main.py
+```
 
-#### For example:
+该入口复用与 CLI 相同的持久化执行路径（读取 `task.json` 的查询与来源）。
+
+## task.json 字段
+
+- `query`：研究问题
+- `max_sections`：报告章节数上限
+- `max_plan_revisions`：规划阶段人工要求修改的最大轮数；`null` 表示不设业务上限
+- `include_human_feedback`：是否开启规划阶段人工审核
+- `source`：`web`、`local` 或 `hybrid`（本地研究使用 PostgreSQL 资料库与冻结范围）
+- `follow_guidelines` / `guidelines`：是否要求报告遵循指定写作规范及规范内容
+- `model`：模型名（由环境变量 `STRATEGIC_LLM`/`SMART_LLM` 覆盖）
+- `verbose`：是否输出详细日志
+
+示例：
+
 ```json
 {
   "query": "Is AI in a hype cycle?",
-  "model": "gpt-4o",
   "max_sections": 3,
   "max_plan_revisions": 3,
   "include_human_feedback": false,
   "source": "web",
   "follow_guidelines": true,
   "guidelines": [
-    "The report MUST fully answer the original question",
-    "The report MUST be written in apa format",
-    "The report MUST be written in english"
+    "报告必须使用 APA 格式",
+    "每个章节必须通过超链接提供支持性来源"
   ],
   "verbose": true
 }
 ```
 
-## To Deploy
+## 导出与部署
 
-The publisher only assembles Markdown. HTTP, WebSocket and CLI exports are created
-once through `backend/server/artifact_service.py` and stored in PostgreSQL.
-The old `publish_formats` task option is ignored; it no longer writes local files.
-Use the CLI's `--no-pdf` and `--no-docx` options to disable individual exports.
+Publisher 只负责组装 Markdown。HTTP、WebSocket 与 CLI 的 Markdown/PDF/DOCX 导出统一由 `backend/server/artifact_service.py` 生成并保存到 PostgreSQL；旧的 `publish_formats` 本地文件导出已移除，`--no-pdf` / `--no-docx` 可关闭对应格式。
 
-```shell
-pip install langgraph-cli
-langgraph up
-```
-
-From there, see documentation [here](https://github.com/langchain-ai/langgraph-example) on how to use the streaming and async endpoints, as well as the playground.
+后端默认通过 Uvicorn 运行；前端使用 `frontend/nextjs`。远程 LangGraph 托管部署只保留原有流式页面行为，不属于默认执行路径。
