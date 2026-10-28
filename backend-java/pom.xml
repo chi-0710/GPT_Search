@@ -21,6 +21,9 @@
     <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-bom</artifactId><version>${spring-ai.version}</version><type>pom</type><scope>import</scope></dependency>
   </dependencies></dependencyManagement>
   <dependencies>
+    <dependency><groupId>org.commonmark</groupId><artifactId>commonmark</artifactId><version>0.30.0</version></dependency>
+    <dependency><groupId>org.commonmark</groupId><artifactId>commonmark-ext-gfm-tables</artifactId><version>0.30.0</version></dependency>
+    <dependency><groupId>io.github.openhtmltopdf</groupId><artifactId>openhtmltopdf-pdfbox</artifactId><version>1.1.37</version></dependency>
     <dependency><groupId>org.apache.pdfbox</groupId><artifactId>pdfbox</artifactId><version>3.0.6</version></dependency>
     <dependency><groupId>org.apache.poi</groupId><artifactId>poi-ooxml</artifactId><version>5.4.1</version></dependency>
     <dependency><groupId>org.apache.poi</groupId><artifactId>poi-scratchpad</artifactId><version>5.4.1</version></dependency>
