@@ -102,6 +102,11 @@ public class ReportWriteService {
         mapper.touch(report, OffsetDateTime.now(ZoneOffset.UTC));
     }
 
+    public void addExchange(String id,JsonNode user,JsonNode assistant) {
+        addMessage(id,user);
+        addMessage(id,assistant);
+    }
+
     private void insertMessage(UUID report, UUID id, long sequence, JsonNode message) {
         requireObject(message);
         String role = textOr(message.get("role"), "user");

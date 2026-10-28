@@ -27,6 +27,39 @@ class ReportWritePostgresTest {
     @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired io.researchrunner.research.RunStore runs;
     @Autowired io.researchrunner.research.ResearchPublication publication;
+    @Autowired io.researchrunner.research.InterruptedTaskRecovery recovery;
+    @Autowired io.researchrunner.document.DocumentStore documents;
+
+    @Test void recoveryOnlyFailsJavaRunsAndPreservesDocumentContent() {
+        var javaRun=runs.create("interrupted Java","multi_agents","web","Objective",Map.of("execution_backend","java"));
+        var pythonRun=runs.create("other runtime","multi_agents","web","Objective",Map.of());
+        var doc=documents.upload("recover-"+UUID.randomUUID()+".txt","text/plain","保留资料".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var id=UUID.fromString(doc.path("id").asText());
+        recovery.recover();
+        assertEquals("failed",read(javaRun.researchId()).path("status").asText());
+        assertEquals("running",read(pythonRun.researchId()).path("status").asText());
+        assertEquals("failed",documents.metadata(id).path("status").asText());
+        assertEquals("保留资料",new String(jdbc.queryForObject("SELECT content FROM documents WHERE id=?",byte[].class,id),java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(0,recovery.recover().get("reports"));
+        runs.fail(pythonRun.runId(),"test cleanup");
+    }
+
+    @Test void chatExchangeRollsBackBothMessagesWhenAssistantIsInvalid() throws Exception {
+        String report=report();
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->writes.addExchange(report,
+                json.readTree("{\"role\":\"user\",\"content\":\"问题\"}"),json.readTree("{\"role\":\"invalid\",\"content\":\"回答\"}")));
+        assertTrue(read(report).path("chatMessages").isEmpty());
+        writes.addExchange(report,json.readTree("{\"role\":\"user\",\"content\":\"问题\"}"),
+                json.readTree("{\"role\":\"assistant\",\"content\":\"回答\",\"metadata\":{\"tool_calls\":[{\"tool\":\"quick_search\"}]}}"));
+        assertEquals(2,read(report).path("chatMessages").size());
+        assertEquals("quick_search",read(report).path("chatMessages").get(1).path("metadata").path("tool_calls").get(0).path("tool").asText());
+    }
+
+    @Test void writeEnabledCorsAllowsBrowserUploadPreflight() {
+        var headers=new HttpHeaders();headers.setOrigin("http://localhost:3800");headers.setAccessControlRequestMethod(HttpMethod.POST);
+        var response=http.exchange("/api/documents",HttpMethod.OPTIONS,new HttpEntity<>(headers),String.class);
+        assertEquals(200,response.getStatusCode().value());assertTrue(response.getHeaders().getAccessControlAllowMethods().contains(HttpMethod.POST));
+    }
     @org.springframework.boot.test.web.server.LocalServerPort int port;
 
     @Test void realWebSocketHandlesPingAndRejectsInvalidRequests() throws Exception {

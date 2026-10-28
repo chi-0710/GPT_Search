@@ -17,9 +17,14 @@ import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorato
 public class ResearchSocket extends TextWebSocketHandler {
     private final ResearchExecutionService research;
     private final ObjectMapper json;
+    private final io.researchrunner.report.ReportChat chat;
+    private final java.util.concurrent.ExecutorService chatExecutor=new java.util.concurrent.ThreadPoolExecutor(2,2,0,
+            java.util.concurrent.TimeUnit.SECONDS,new java.util.concurrent.ArrayBlockingQueue<>(32),Thread.ofVirtual().factory(),
+            new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
+    private final Map<String,java.util.concurrent.Future<?>> chatTasks=new ConcurrentHashMap<>();
     private record Client(WebSocketSession socket,ResearchConnection run) {}
     private final Map<String,Client> clients=new ConcurrentHashMap<>();
-    public ResearchSocket(ResearchExecutionService research,ObjectMapper json) {this.research=research;this.json=json;}
+    public ResearchSocket(ResearchExecutionService research,ObjectMapper json,io.researchrunner.report.ReportChat chat) {this.research=research;this.json=json;this.chat=chat;}
     @Override public void afterConnectionEstablished(WebSocketSession session) {
         var safe=new ConcurrentWebSocketSessionDecorator(session,10000,1024*1024);
         clients.put(session.getId(),new Client(safe,research.connection(event->safe.sendMessage(new TextMessage(json.writeValueAsString(event))))));
@@ -45,7 +50,27 @@ public class ResearchSocket extends TextWebSocketHandler {
                             || !client.run().feedback(run,number.intValue(),Objects.toString(body.get("request_id"),""),
                                 Objects.toString(body.getOrDefault("feedback",body.get("content")),"")))throw new IllegalArgumentException("人工反馈已过期或不属于当前审核");
                 }
-                case "chat" -> throw new IllegalArgumentException("Java 报告跟进聊天尚未接入");
+                case "chat" -> {
+                    if(!body.containsKey("messages") && body.get("message") instanceof String question)
+                        body.put("messages",List.of(Map.of("role","user","content",question)));
+                    body.putIfAbsent("report","");
+                    var task=new java.util.concurrent.FutureTask<Void>(()->{
+                        try {
+                            var answer=json.valueToTree(chat.chat(json.valueToTree(body)).get("response"));
+                            ((com.fasterxml.jackson.databind.node.ObjectNode)answer).put("type","chat");
+                            if(client.socket().isOpen() && !Thread.currentThread().isInterrupted())
+                                client.socket().sendMessage(new TextMessage(json.writeValueAsString(answer)));
+                        } catch(Exception error) {
+                            if(client.socket().isOpen() && !Thread.currentThread().isInterrupted())
+                                client.socket().sendMessage(new TextMessage(json.writeValueAsString(Map.of("type","error","output","聊天请求失败"))));
+                        }
+                        return null;
+                    }) {
+                        @Override protected void done(){chatTasks.remove(session.getId(),this);}
+                    };
+                    if(chatTasks.putIfAbsent(session.getId(),task)!=null)throw new IllegalArgumentException("聊天请求仍在执行");
+                    try{chatExecutor.execute(task);}catch(java.util.concurrent.RejectedExecutionException error){task.cancel(true);throw error;}
+                }
                 default -> throw new IllegalArgumentException("未知 WebSocket 命令");
             }
         } catch(Exception error) {
@@ -54,6 +79,7 @@ public class ResearchSocket extends TextWebSocketHandler {
     }
     @Override public void afterConnectionClosed(WebSocketSession session,CloseStatus status) throws InterruptedException {
         var client=clients.remove(session.getId());
+        var task=chatTasks.remove(session.getId());if(task!=null)task.cancel(true);
         if(client!=null) {
             client.run().close();
             if(!client.run().awaitCleanup(java.time.Duration.ofSeconds(15)))
@@ -62,5 +88,9 @@ public class ResearchSocket extends TextWebSocketHandler {
     }
     @Override public void handleTransportError(WebSocketSession session,Throwable error) throws Exception {
         try{afterConnectionClosed(session,CloseStatus.SERVER_ERROR);}finally{session.close(CloseStatus.SERVER_ERROR);}
+    }
+    @jakarta.annotation.PreDestroy public void close() throws InterruptedException {
+        for(var task:chatTasks.values())task.cancel(true);
+        chatExecutor.shutdownNow();chatExecutor.awaitTermination(15,java.util.concurrent.TimeUnit.SECONDS);
     }
 }

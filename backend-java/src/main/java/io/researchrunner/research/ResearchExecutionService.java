@@ -65,6 +65,7 @@ public class ResearchExecutionService {
         if(!source.equals("local") && !env.getProperty("RETRIEVER","tavily").equals("tavily"))throw invalid("此研究入口尚只接入 Tavily 检索器");
         var usage=new UsageLedger();var model=new SpringResearchModel(binding("FAST",6000),binding("SMART",12000),binding("STRATEGIC",8000),usage,json);
         Map<String,Object> options=new LinkedHashMap<>(request);options.put("resolved_document_ids",scope.stream().map(UUID::toString).toList());
+        options.put("execution_backend","java");
         var run=connection.create(()->runs.create(query,mode,source,tone,options));
         active.add(connection);
         Callable<Map<String,Object>> work=()->{
@@ -118,13 +119,7 @@ public class ResearchExecutionService {
             throw e;
         }
     }
-    private SpringResearchModel.Binding binding(String role,int tokens) {
-        String value=env.getProperty(role+"_LLM");if(value==null || !value.contains(":"))throw invalid(role+"_LLM 必须显式配置供应商和模型");
-        String[] parts=value.split(":",2);Map<String,String> variables=new HashMap<>();
-        for(String name:List.of("OPENAI_API_KEY","OPENAI_BASE_URL","DEEPSEEK_API_KEY","DASHSCOPE_API_KEY","DASHSCOPE_BASE_URL","OPENROUTER_API_KEY","NEBIUS_API_KEY","NEBIUS_BASE_URL","ATLASCLOUD_API_KEY","VLLM_OPENAI_API_KEY","VLLM_OPENAI_API_BASE","AIMLAPI_API_KEY","FORGE_API_KEY","AVIAN_API_KEY","MINIMAX_API_KEY"))if(env.getProperty(name)!=null)variables.put(name,env.getProperty(name));
-        var config=CompatibleModelFactory.settings(parts[0],parts[1],variables);
-        return new SpringResearchModel.Binding(parts[0],parts[1],new CompatibleModelFactory().chat(config,env.getProperty(role+"_TOKEN_LIMIT",Integer.class,tokens),env.getProperty("TEMPERATURE",Double.class,0.4)),null);
-    }
+    private SpringResearchModel.Binding binding(String role,int tokens) {return new ConfiguredChatModels(env).binding(role,tokens);}
     private static List<?> list(Map<String,Object> request,String key){return request.get(key) instanceof List<?> values?values:List.of();}
     private static List<String> strings(Map<String,Object> request,String key){return list(request,key).stream().map(Object::toString).toList();}
     private static ResponseStatusException invalid(String detail){return new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,detail);}

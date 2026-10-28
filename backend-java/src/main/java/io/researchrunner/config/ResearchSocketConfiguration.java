@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.*;
 
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 @EnableWebSocket
 @ConditionalOnProperty(name="researchrunner.writes-enabled",havingValue="true")
 public class ResearchSocketConfiguration implements WebSocketConfigurer {
