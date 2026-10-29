@@ -5,7 +5,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
-  const backendUrl = process.env.NEXT_PUBLIC_GPTR_API_URL || 'http://localhost:8000';
+  const backendUrl = process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_GPTR_API_URL ||
+    'http://localhost:8000';
   
   try {
     console.log(`GET /api/reports/${id} - Proxying request to backend`);
@@ -14,9 +16,9 @@ export async function GET(
     
     if (!response.ok) {
       // Handle backend errors
-      const errorData = await response.json().catch(() => ({ detail: `Error ${response.status}` }));
+      const errorData = await response.json().catch(() => ({ detail: `后端错误 ${response.status}` }));
       return NextResponse.json(
-        { error: errorData.detail || 'Failed to fetch report' },
+        { error: errorData.detail || '获取研究报告失败' },
         { status: response.status }
       );
     }
@@ -26,7 +28,7 @@ export async function GET(
   } catch (error) {
     console.error(`GET /api/reports/${id} - Error proxying to backend:`, error);
     return NextResponse.json(
-      { error: 'Failed to connect to backend service' },
+      { error: '无法连接到后端服务' },
       { status: 500 }
     );
   }
@@ -37,7 +39,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
-  const backendUrl = process.env.NEXT_PUBLIC_GPTR_API_URL || 'http://localhost:8000';
+  const backendUrl = process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_GPTR_API_URL ||
+    'http://localhost:8000';
   
   try {
     console.log(`DELETE /api/reports/${id} - Proxying request to backend`);
@@ -48,9 +52,9 @@ export async function DELETE(
     
     if (!response.ok && response.status !== 404) {
       // Handle backend errors
-      const errorData = await response.json().catch(() => ({ detail: `Error ${response.status}` }));
+      const errorData = await response.json().catch(() => ({ detail: `后端错误 ${response.status}` }));
       return NextResponse.json(
-        { error: errorData.detail || 'Failed to delete report' },
+        { error: errorData.detail || '删除研究报告失败' },
         { status: response.status }
       );
     }
@@ -59,7 +63,7 @@ export async function DELETE(
   } catch (error) {
     console.error(`DELETE /api/reports/${id} - Error proxying to backend:`, error);
     return NextResponse.json(
-      { error: 'Failed to connect to backend service' },
+      { error: '无法连接到后端服务' },
       { status: 500 }
     );
   }
@@ -70,7 +74,9 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
-  const backendUrl = process.env.NEXT_PUBLIC_GPTR_API_URL || 'http://localhost:8000';
+  const backendUrl = process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_GPTR_API_URL ||
+    'http://localhost:8000';
   
   try {
     // Parse the request body
@@ -80,7 +86,7 @@ export async function PUT(
     } catch (parseError) {
       console.error('Error parsing request body:', parseError);
       return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
+        { error: '请求正文中的 JSON 格式无效' },
         { status: 400 }
       );
     }
@@ -97,9 +103,9 @@ export async function PUT(
     
     if (!response.ok) {
       // Handle backend errors
-      const errorData = await response.json().catch(() => ({ detail: `Error ${response.status}` }));
+      const errorData = await response.json().catch(() => ({ detail: `后端错误 ${response.status}` }));
       return NextResponse.json(
-        { error: errorData.detail || 'Failed to update report' },
+        { error: errorData.detail || '更新研究报告失败' },
         { status: response.status }
       );
     }
@@ -109,8 +115,8 @@ export async function PUT(
   } catch (error) {
     console.error(`PUT /api/reports/${id} - Error proxying to backend:`, error);
     return NextResponse.json(
-      { error: 'Failed to connect to backend service' },
+      { error: '无法连接到后端服务' },
       { status: 500 }
     );
   }
-} 
+}

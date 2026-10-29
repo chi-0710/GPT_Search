@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  const backendUrl = process.env.NEXT_PUBLIC_GPTR_API_URL || 'http://localhost:8000';
+  const backendUrl = process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_GPTR_API_URL ||
+    'http://localhost:8000';
   
   try {
     // Parse the request body
@@ -11,7 +13,7 @@ export async function POST(request: Request) {
     } catch (parseError) {
       console.error('Error parsing request body:', parseError);
       return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
+        { error: '请求正文中的 JSON 格式无效' },
         { status: 400 }
       );
     }
@@ -31,8 +33,8 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('POST /api/chat - Error proxying to backend:', error);
     return NextResponse.json(
-      { error: 'Failed to connect to backend service' },
+      { error: '无法连接到后端服务' },
       { status: 500 }
     );
   }
-} 
+}

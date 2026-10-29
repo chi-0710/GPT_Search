@@ -1,5 +1,6 @@
-param([string]$MavenImage = 'maven:3.9.9-eclipse-temurin-21', [switch]$JavaOnly)
+param([string]$MavenImage = 'maven:3.9.9-eclipse-temurin-21', [switch]$JavaOnly = $true)
 $ErrorActionPreference = 'Stop'
+if (-not $JavaOnly) { throw 'Only Java-only database bootstrap is supported.' }
 $taskRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $taskJava = Join-Path $taskRoot 'backend-java'
 $taskName = "researchrunner-migration-test-$PID"
@@ -40,11 +41,6 @@ try {
             -e POSTGRES_USER=java_test -e POSTGRES_PASSWORD=java_test `
             --mount "type=bind,source=$taskJava,target=/workspace,readonly" `
             $MavenImage java -jar target/researchrunner-api-0.1.0-SNAPSHOT.jar migrate
-    } else {
-      Invoke-CheckedDocker run --rm --network $taskNetwork --entrypoint python `
-        -e DATABASE_URL=postgresql+asyncpg://java_test:java_test@test-db:5432/researchrunner_java_write_test `
-        --mount "type=bind,source=$taskRoot,target=/usr/src/app,readonly" `
-        gptresearcher/gpt-researcher -m alembic upgrade head
     }
     Invoke-CheckedDocker run --rm --network $taskNetwork -w /workspace `
         -e JAVA_TEST_DATABASE_URL=jdbc:postgresql://test-db:5432/researchrunner_java_test `

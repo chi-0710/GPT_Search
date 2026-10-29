@@ -1,96 +1,58 @@
-# GPT Researcher UI
+> 当前实现：仅保留 LangGraph 多智能体报告，支持网络、文件和混合资料来源。旧报告模式请求自动转换；内部草稿格式继续保留。
 
-A React component library for integrating the GPT Researcher interface into your React applications. Take it for a test ride with the [GPTR React Starter Template](https://github.com/elishakay/gpt-researcher-react), or simply:
+# 知行研究助手（ResearchRunner）前端
 
-<div align="center" id="top">
+该目录包含 知行研究助手 的 Next.js 前端，同时可构建为 React 组件库。前端默认连接本地后端，并提供研究配置、进度展示、历史记录、报告查看和继续提问等功能。
 
-<img src="https://github.com/assafelovic/gpt-researcher/assets/13554167/20af8286-b386-44a5-9a83-3be1365139c3" alt="Logo" width="80">
+## 环境要求
 
-####
+- Node.js 18 或更高版本
+- npm
+- 已启动的 知行研究助手 后端
 
-[![Website](https://img.shields.io/badge/Official%20Website-gptr.dev-teal?style=for-the-badge&logo=world&logoColor=white&color=0891b2)](https://gptr.dev)
-[![Documentation](https://img.shields.io/badge/Documentation-DOCS-f472b6?logo=googledocs&logoColor=white&style=for-the-badge)](https://docs.gptr.dev)
-[![Discord Follow](https://dcbadge.vercel.app/api/server/QgZXvJAccX?style=for-the-badge&theme=clean-inverted&?compact=true)](https://discord.gg/QgZXvJAccX)
+## 配置
 
-[![PyPI version](https://img.shields.io/pypi/v/gpt-researcher?logo=pypi&logoColor=white&style=flat)](https://badge.fury.io/py/gpt-researcher)
-![GitHub Release](https://img.shields.io/github/v/release/assafelovic/gpt-researcher?style=flat&logo=github)
-[![Open In Colab](https://img.shields.io/static/v1?message=Open%20in%20Colab&logo=googlecolab&labelColor=grey&color=yellow&label=%20&style=flat&logoSize=40)](https://colab.research.google.com/github/assafelovic/gpt-researcher/blob/master/docs/docs/examples/pip-run.ipynb)
-[![Docker Image Version](https://img.shields.io/docker/v/elestio/gpt-researcher/latest?arch=amd64&style=flat&logo=docker&logoColor=white&color=1D63ED)](https://hub.docker.com/r/gptresearcher/gpt-researcher)
+在当前目录创建 `.env.local`：
 
-[English](README.md) | [中文](README-zh_CN.md) | [日本語](README-ja_JP.md) | [한국어](README-ko_KR.md)
-
-</div>
-
-# 🔎 GPT Researcher
-
-**GPT Researcher is an open deep research agent designed for both web and local research on any given task.** 
-
-The agent produces detailed, factual, and unbiased research reports with citations. GPT Researcher provides a full suite of customization options to create tailor made and domain specific research agents. Inspired by the recent [Plan-and-Solve](https://arxiv.org/abs/2305.04091) and [RAG](https://arxiv.org/abs/2005.11401) papers, GPT Researcher addresses misinformation, speed, determinism, and reliability by offering stable performance and increased speed through parallelized agent work.
-
-**Our mission is to empower individuals and organizations with accurate, unbiased, and factual information through AI.**
-
-
-## Installation
-
-```bash
-npm install gpt-researcher-ui
+```dotenv
+NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000
 ```
 
-## Usage
+修改环境变量后需要重新启动前端。
 
-```javascript
-import React from 'react';
-import { GPTResearcher } from 'gpt-researcher-ui';
+## 安装与启动
 
-function App() {
-  return (
-    <div className="App">
-      <GPTResearcher 
-        apiUrl="http://localhost:8000"
-        defaultPrompt="What is quantum computing?"
-        onResultsChange={(results) => console.log('Research results:', results)}
-      />
-    </div>
-  );
-}
+所有 npm 命令都要在 `frontend/nextjs` 目录执行：
 
-export default App;
+```powershell
+cd frontend/nextjs
+npm install --legacy-peer-deps
+npm run dev
 ```
 
-## Advanced Usage
+浏览器打开 <http://localhost:3000>。
 
-```javascript
-import React, { useState } from 'react';
-import { GPTResearcher } from 'gpt-researcher-ui';
+`npm install` 只需在首次运行或依赖变化后执行；日常启动直接运行 `npm run dev`。
 
-function App() {
-  const [results, setResults] = useState([]);
+## 可用命令
 
-  const handleResultsChange = (newResults) => {
-    setResults(newResults);
-    console.log('Research progress:', newResults);
-  };
-
-  return (
-    <div className="App">
-      <h1>My Research Application</h1>
-      
-      <GPTResearcher 
-        apiUrl="http://localhost:8000"
-        apiKey="your-api-key-if-needed"
-        defaultPrompt="Explain the impact of quantum computing on cryptography"
-        onResultsChange={handleResultsChange}
-      />
-      
-      {/* You can use the results state elsewhere in your app */}
-      <div className="results-summary">
-        {results.length > 0 && (
-          <p>Research in progress: {results.length} items processed</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default App;
+```powershell
+npm run dev        # 启动开发服务器
+npm run build      # 构建生产版本
+npm run start      # 启动已构建的生产版本
+npm run lint       # 检查代码规范
+npm run build:lib  # 构建 React 组件库
 ```
+
+生产环境启动前，请先执行：
+
+```powershell
+npm run build
+npm run start
+```
+
+## 常见问题
+
+如果出现 `Could not read package.json` 或 `ENOENT`，通常是因为在项目根目录执行了 npm 命令。请先进入 `frontend/nextjs` 再运行。
+
+如果页面无法连接后端，请确认后端已经启动，并检查 `.env.local` 中的地址是否正确。

@@ -1,7 +1,9 @@
-# Benchmark: GPT Researcher as a Deep Agent's Research Engine
+> 历史归档：本目录仅保留实验数据、结果和来源说明；文中运行命令对应的执行代码已移除，不能继续使用。当前应用仅使用 LangGraph 多智能体工作流。
+
+# Benchmark: ResearchRunner as a Deep Agent's Research Engine
 
 Does giving a [deep agent](https://docs.langchain.com/oss/python/deepagents/overview)
-GPT Researcher as its research engine actually produce better research than
+ResearchRunner as its research engine actually produce better research than
 the stock setup? We measured it on
 [DeepResearch Bench](https://github.com/Ayanami0730/deep_research_bench), the
 industry-standard benchmark for deep research agents (100 PhD-vetted research
@@ -11,13 +13,13 @@ tasks; we sampled 10 English tasks stratified across its topic domains).
 
 Two deep agents, identical in every way except the research tooling:
 
-| | Baseline | GPT Researcher agent |
+| | Baseline | ResearchRunner agent |
 |---|---|---|
 | Harness | `deepagents` `create_deep_agent` | same |
 | Model | `gpt-5.4` | same |
 | System prompt | shared report-writing prompt | same |
 | Step budget | recursion limit 60 | same |
-| Research tools | raw Tavily `internet_search` (the [deepagents quickstart](https://docs.langchain.com/oss/python/deepagents/quickstart) setup) | GPT Researcher `quick_search` + `deep_research` |
+| Research tools | raw Tavily `internet_search` (the [deepagents quickstart](https://docs.langchain.com/oss/python/deepagents/quickstart) setup) | ResearchRunner `quick_search` + `deep_research` |
 
 Both agents were asked to produce fully cited markdown research reports.
 Scoring used the official DeepResearch Bench pipeline:
@@ -30,7 +32,7 @@ Scoring used the official DeepResearch Bench pipeline:
 
 ## Results
 
-| Metric | Baseline (Tavily) | GPT Researcher agent | Δ |
+| Metric | Baseline (Tavily) | ResearchRunner agent | Δ |
 |---|---|---|---|
 | RACE overall | 0.503 | **0.512** | +1.9% |
 | Citations per report | 34.5 | **62.9** | +82% |
@@ -38,7 +40,7 @@ Scoring used the official DeepResearch Bench pipeline:
 | Citation precision | 53.9% | **56.0%** | +2.1pts |
 | Per-task wins (effective citations) | 3 | **7** | |
 
-The headline: at the same model, prompt and step budget, the GPT Researcher
+The headline: at the same model, prompt and step budget, the ResearchRunner
 agent grounds its reports in **~2x the verified evidence** of the stock
 deep-agent setup, with report quality (RACE) also ahead on every dimension.
 For calibration against the published DeepResearch Bench leaderboard, 35
@@ -46,12 +48,12 @@ effective citations per report is in the range of dedicated deep research
 products (OpenAI Deep Research ~40, plain LLMs with search tools ~5-15).
 
 Why: a raw search tool returns snippets, so the writing model cites whatever
-the search API surfaced. GPT Researcher's pipeline plans sub-queries, scrapes
+the search API surfaced. ResearchRunner's pipeline plans sub-queries, scrapes
 and reads the actual pages, filters content by relevance against the query,
 and returns pre-cited synthesis - so far more of what reaches the final
 report is real, verifiable sourcing.
 
-The gains compound with GPT Researcher core improvements
+The gains compound with ResearchRunner core improvements
 ([#1861](https://github.com/assafelovic/gpt-researcher/pull/1861): smarter
 Tavily `site:` handling, scrapers that reject error pages and retry transient
 failures, stricter relevance filtering, stronger citation grounding in
@@ -70,14 +72,14 @@ The gap opens when the task is actual research.
 **Report head-to-head (n=8, LLM judge).** Before adopting DeepResearch
 Bench we ran a blind pairwise comparison: both agents wrote reports on the
 same 8 topics, and an LLM judge picked the better report of each pair
-(sides randomized). The GPT Researcher agent won **overall on 5 of 8
+(sides randomized). The ResearchRunner agent won **overall on 5 of 8
 topics**, with more distinct sources cited per report (24.5 vs 19.5 unique
 URLs) at comparable length. This run predates the core improvements of
 [#1861](https://github.com/assafelovic/gpt-researcher/pull/1861);
 DeepResearch Bench above is the rigorous, post-fix version of the same
 question. Reproduce with `python deep_agents/report_benchmark.py`.
 
-**Breadth beyond the web: private documents.** GPT Researcher's `local` and
+**Breadth beyond the web: private documents.** ResearchRunner's `local` and
 `hybrid` modes run the same pipeline over your own documents (`DOC_PATH`).
 We measured this with a due-diligence task over a corpus of fictional
 internal company documents (an invented robotics company, so no fact can
@@ -90,13 +92,13 @@ surrounded by distractors (HR policies, IT runbooks, marketing notes) and
 stale archived vintages of the same reports whose outdated numbers count as
 wrong. Three arms: the raw-search baseline, the obvious DIY alternative
 (stock deepagents with its `ls`/`read_file` tools mounted on the corpus),
-and GPT Researcher in hybrid mode:
+and ResearchRunner in hybrid mode:
 
 | Internal-fact coverage (avg of 3 runs) | |
 |---|---|
 | Deep agent + raw search | 0% |
 | Deep agent + raw search + file tools on the corpus | 62.5% |
-| Deep agent + GPT Researcher (hybrid) | **87.5% (up to 94%)** |
+| Deep agent + ResearchRunner (hybrid) | **87.5% (up to 94%)** |
 
 (Public-web fact coverage is equal across all three arms, ~40-46%.)
 
@@ -106,7 +108,7 @@ the four fact documents as markdown it even reaches parity - but on the
 realistic corpus it turns erratic: it must guess which of 27 files to read
 within its step budget, plain-text file reads cannot parse DOCX (it missed
 or took stale values for the product-brief facts in every run), and it
-sometimes trusts an archived vintage. GPT Researcher's document pipeline
+sometimes trusts an archived vintage. ResearchRunner's document pipeline
 (format-aware parsing, embedding-based retrieval over the whole corpus)
 recovers up to 94% of the internal facts, at equal web coverage, in the
 same run that researches the web. Reproduce with

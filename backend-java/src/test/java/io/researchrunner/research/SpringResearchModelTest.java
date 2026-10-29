@@ -26,4 +26,17 @@ class SpringResearchModelTest {
         assertThrows(IllegalStateException.class,()->model.generate("fact_checker","指令",Map.of()));
         verifyNoMoreInteractions(fast,smart);
     }
+    @Test void reviewUsesDedicatedClientAndTruncationNeverRetries() throws Exception {
+        var normal=mock(ChatModel.class);var review=mock(ChatModel.class);
+        var metadata=org.springframework.ai.chat.metadata.ChatGenerationMetadata.builder().finishReason("length").build();
+        when(review.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("截断"),metadata))));
+        var binding=new SpringResearchModel.Binding("test","normal",normal,null);
+        var dedicated=new SpringResearchModel.Binding("test","review",review,null);
+        var ledger=new UsageLedger();
+        var model=new SpringResearchModel(binding,binding,binding,ledger,new ObjectMapper(),Map.of("fact_checker",dedicated));
+        var error=assertThrows(IllegalStateException.class,()->model.generate("fact_checker","审核",Map.of()));
+        assertTrue(error.getMessage().contains("fact_checker"));
+        verify(review,times(1)).call(any(Prompt.class));verifyNoInteractions(normal);
+        assertEquals(1,((List<?>)ledger.snapshot().get("model_calls")).size());
+    }
 }

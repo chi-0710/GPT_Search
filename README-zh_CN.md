@@ -1,188 +1,140 @@
-<div align="center">
-<!--<h1 style="display: flex; align-items: center; gap: 10px;">
-  <img src="https://github.com/assafelovic/gpt-researcher/assets/13554167/a45bac7c-092c-42e5-8eb6-69acbf20dde5" alt="Logo" width="25">
-  GPT Researcher
-</h1>-->
-<img src="https://github.com/assafelovic/gpt-researcher/assets/13554167/20af8286-b386-44a5-9a83-3be1365139c3" alt="Logo" width="80">
+# 知行研究助手（ResearchRunner）
 
+知行研究助手基于网络资料、本地文档或混合来源生成带引用的中文研究报告，支持研究规划审核、历史记录、报告追问及文件导出。
 
-####
+当前后端采用 **Java 21 + Spring Boot**，前端采用 **Next.js + React + TypeScript**，业务数据与文档向量统一保存至 **PostgreSQL + pgvector**。旧 Python 实现已移除，构建和启动不再需要 Python。
 
-[![Website](https://img.shields.io/badge/Official%20Website-gptr.dev-teal?style=for-the-badge&logo=world&logoColor=white&color=0891b2)](https://gptr.dev)
-[![Documentation](https://img.shields.io/badge/Documentation-DOCS-f472b6?logo=googledocs&logoColor=white&style=for-the-badge)](https://docs.gptr.dev)
-[![Discord Follow](https://img.shields.io/discord/1127851779011391548?style=for-the-badge&logo=discord&label=Chat%20on%20Discord)](https://discord.gg/QgZXvJAccX)
+## 主要功能
 
-[![PyPI version](https://img.shields.io/pypi/v/gpt-researcher?logo=pypi&logoColor=white&style=flat)](https://badge.fury.io/py/gpt-researcher)
-![GitHub Release](https://img.shields.io/github/v/release/assafelovic/gpt-researcher?style=flat&logo=github)
-[![Open In Colab](https://img.shields.io/static/v1?message=Open%20in%20Colab&logo=googlecolab&labelColor=grey&color=yellow&label=%20&style=flat&logoSize=40)](https://colab.research.google.com/github/assafelovic/gpt-researcher/blob/master/docs/docs/examples/pip-run.ipynb)
-[![Docker Image Version](https://img.shields.io/docker/v/elestio/gpt-researcher/latest?arch=amd64&style=flat&logo=docker&logoColor=white&color=1D63ED)](https://hub.docker.com/r/gptresearcher/gpt-researcher)
-[![Twitter Follow](https://img.shields.io/twitter/follow/assaf_elovic?style=social)](https://twitter.com/assaf_elovic)
+- `web`、`local`、`hybrid` 三种研究来源；唯一公开执行模式为 `multi_agents`。
+- 初步研究 → 规划与人工审核 → 并行章节研究、审核和修订 → 写作 → 事实核查 → 可视化与发布。
+- 共享证据编号、引用快照和资料范围约束。
+- 文档上传、向量索引、检索、重新索引与原文件访问。
+- 研究过程展示、历史报告、报告追问，以及 Markdown、PDF、DOCX 导出。
+- HTTP、WebSocket 和 Java CLI 共用研究能力。
 
-[English](README.md) |
-[中文](README-zh_CN.md) |
-[日本語](README-ja_JP.md) |
-[한국어](README-ko_KR.md)
-</div>
+## 技术与目录
 
-# 🔎 GPT Researcher
+| 目录 | 用途 |
+| --- | --- |
+| `backend-java/` | Spring Boot API、Spring AI 模型调用、LangGraph4j 工作流、MyBatis 持久化与 Flyway 迁移 |
+| `frontend/nextjs/` | 网页界面、研究过程展示及后端代理 |
+| `scripts/` | Java 隔离回归与真实供应商验收脚本 |
+| `tests/` | 保留的前端协议测试和测试夹具 |
+| `deep_agents/` | 历史实验数据与来源记录 |
 
-**GPT Researcher 是一个智能体代理，专为各种任务的综合在线研究而设计。**
+旧目录中可能仍保留文档、样式或历史资料，不再作为 Python 执行入口。
 
-代理可以生成详细、正式且客观的研究报告，并提供自定义选项，专注于相关资源、结构框架和经验报告。受最近发表的[Plan-and-Solve](https://arxiv.org/abs/2305.04091) 和[RAG](https://arxiv.org/abs/2005.11401) 论文的启发，GPT Researcher 解决了速度、确定性和可靠性等问题，通过并行化的代理运行，而不是同步操作，提供了更稳定的性能和更高的速度。
+## 配置
 
-**我们的使命是利用人工智能的力量，为个人和组织提供准确、客观和事实的信息。**
+推荐使用 Docker Desktop 的 Linux-container 模式。容器内使用 Java 21 和 Node.js 22，不要求本机安装 Java、Maven 或 Node.js。
 
-## 为什么选择GPT Researcher?
+首次安装可复制 `.env.example` 为根目录 `.env`；已有 `.env` 不要覆盖。示例文件仍含部分历史选项，当前生效的容器配置以 `docker-compose.yml` 为准。
 
-- 因为人工研究任务形成客观结论可能需要时间和经历，有时甚至需要数周才能找到正确的资源和信息。
-- 目前的LLM是根据历史和过时的信息进行训练的，存在严重的幻觉风险，因此几乎无法胜任研究任务。
-- 网络搜索的解决方案（例如 ChatGPT + Web 插件）仅考虑有限的资源和内容，在某些情况下会导致肤浅的结论或不客观的答案。
-- 只使用部分资源可能会在确定研究问题或任务的正确结论时产生偏差。
+在 `.env` 中明确设置以下内容：
 
-## 架构
-主要思想是运行“**计划者**”和“**执行**”代理，而**计划者**生成问题进行研究，“**执行**”代理根据每个生成的研究问题寻找最相关的信息。最后，“**计划者**”过滤和聚合所有相关信息并创建研究报告。<br /> <br /> 
-代理同时利用 gpt-40-mini 和 gpt-4o（128K 上下文）来完成一项研究任务。我们仅在必要时使用这两种方法对成本进行优化。**研究任务平均耗时约 3 分钟，成本约为 ~0.1 美元**。
+| 配置 | 说明 |
+| --- | --- |
+| `FAST_LLM`、`SMART_LLM`、`STRATEGIC_LLM` | `供应商:模型`；本项目使用 DeepSeek，保留自己的模型名称 |
+| `DEEPSEEK_API_KEY` | DeepSeek 密钥 |
+| `EMBEDDING`、`EMBEDDING_DIMENSION` | DashScope/Qwen 嵌入模型和匹配的向量维度 |
+| `DASHSCOPE_API_KEY` | DashScope 密钥 |
+| `TAVILY_API_KEY` | 网络搜索密钥 |
+| `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD` | 数据库配置；已有库不要随意更换 |
+| `FRONTEND_PORT` | 前端端口；Compose 默认 3002，本机配置为 3800 |
+| `NEXT_PUBLIC_GPTR_API_URL` | 浏览器访问后端的地址，例如 `http://localhost:8000` |
+| `PUBLIC_API_URL` | 导出文件与引用使用的公开后端地址，例如 `http://localhost:8000` |
 
-<div align="center">
-<img align="center" height="500" src="https://cowriter-images.s3.amazonaws.com/architecture.png">
-</div>
+Compose 使用服务名 `postgres` 生成 JDBC 数据库地址；前端服务端代理使用 `http://gpt-researcher:8000`。容器内部地址不能替代浏览器公开地址。不要提交 `.env` 或在日志中输出密钥。
 
+## Docker 启动
 
-详细说明:
-* 根据研究搜索或任务创建特定领域的代理。
-* 生成一组研究问题，这些问题共同形成答案对任何给定任务的客观意见。
-* 针对每个研究问题，触发一个爬虫代理，从在线资源中搜索与给定任务相关的信息。
-* 对于每一个抓取的资源，根据相关信息进行汇总，并跟踪其来源。
-* 最后，对所有汇总的资料来源进行过滤和汇总，并生成最终研究报告。
+在项目根目录运行：
 
-## 演示
-https://github.com/assafelovic/gpt-researcher/assets/13554167/a00c89a6-a295-4dd0-b58d-098a31c40fda
-
-## 教程
- - [运行原理](https://docs.gptr.dev/blog/building-gpt-researcher)
- - [如何安装](https://www.loom.com/share/04ebffb6ed2a4520a27c3e3addcdde20?sid=da1848e8-b1f1-42d1-93c3-5b0b9c3b24ea)
- - [现场演示](https://www.loom.com/share/6a3385db4e8747a1913dd85a7834846f?sid=a740fd5b-2aa3-457e-8fb7-86976f59f9b8)
-
-## 特性
-- 📝 生成研究问题、大纲、资源和课题报告
-- 🌐 每项研究汇总超过20个网络资源，形成客观和真实的结论
-- 🖥️ 包括易于使用的web界面 (HTML/CSS/JS)
-- 🔍 支持JavaScript网络资源抓取功能
-- 📂 追踪访问过和使用过的网络资源和来源
-- 📄 将研究报告导出为PDF或其他格式...
-
-## 📖 文档
-
-请参阅[此处](https://docs.gptr.dev/docs/gpt-researcher/getting-started/introduction)，了解完整文档：
-
-- 入门（安装、设置环境、简单示例）
-- 操作示例（演示、集成、docker 支持）
-- 参考资料（API完整文档）
-- Tavily 应用程序接口集成（核心概念的高级解释）
-
-## 快速开始
-> **步骤 0** - 安装 Python 3.11 或更高版本。[参见此处](https://www.tutorialsteacher.com/python/install-python) 获取详细指南。
-
-<br />
-
-> **步骤 1** - 下载项目
-
-```bash
-$ git clone https://github.com/assafelovic/gpt-researcher.git
-$ cd gpt-researcher
+```powershell
+docker compose ps -a
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps -a
 ```
 
-<br />
+数据库健康后运行 Java 迁移服务，迁移成功后启动后端。`migration` 显示 `Exited (0)` 属于正常状态。
 
-> **步骤2** -安装依赖项
-```bash
-$ pip install -r requirements.txt
-```
-<br />
+- 本机前端：[http://localhost:3800](http://localhost:3800)（其他环境按 `FRONTEND_PORT` 调整）。
+- 后端就绪检查：[http://localhost:8000/health/ready](http://localhost:8000/health/ready)。
 
-> **第 3 步** - 使用 OpenAI 密钥和 Tavily API 密钥创建 .env 文件，或直接导出该文件
+旧容器不会因源码删除而自动转换为 Java，需要重新构建并创建。后端源码修改后需重建镜像；前端开发容器使用目录挂载。
 
-```bash
-$ export OPENAI_API_KEY={Your OpenAI API Key here}
-```
-```bash
-$ export TAVILY_API_KEY={Your Tavily API Key here}
+已有 Java 镜像且无需重建时：
+
+```powershell
+docker compose up -d --no-build --pull never
 ```
 
-（可选）如需开启全链路追踪和可观测性，可设置：
+### 旧数据库首次接管
 
-```bash
-# $ export LANGCHAIN_TRACING_V2=true
-# $ export LANGCHAIN_API_KEY={Your LangChain API Key here}
+先备份数据库并验证恢复，停止业务写入，再构建 Java 镜像并显式执行旧库基线：
+
+```powershell
+docker compose stop gpt-researcher
+docker compose build gpt-researcher
+docker compose run --rm migration migrate --baseline-existing
+docker compose up -d --no-build --pull never
 ```
 
-- **LLM，我们推荐使用 [OpenAI GPT](https://platform.openai.com/docs/guides/gpt)**，但您也可以使用 [Langchain Adapter](https://python.langchain.com/docs/guides/adapters/openai) 支持的任何其他 LLM 模型（包括开源），只需在 gpt_researcher/config/variables/default.py 中更改 llm 模型和提供者即可。请按照 [这份指南](https://python.langchain.com/docs/integrations/llms/) 学习如何将 LLM 与 Langchain 集成。
-- **对于搜索引擎，我们推荐使用 [Tavily Search API](https://app.tavily.com)（已针对 LLM 进行优化）**，但您也可以选择其他搜索引擎，只需将 gpt_researcher/config/variables/default.py 中的搜索提供程序更改为 "duckduckgo"、"googleAPI"、"searchapi"、"googleSerp "或 "searx "即可。然后在 gpt_researcher/config/variables/default.py 文件中添加相应的 env API 密钥。
-- **我们强烈建议使用 [OpenAI GPT](https://platform.openai.com/docs/guides/gpt) 模型和 [Tavily Search API](https://app.tavily.com) 以获得最佳性能。**
-<br />
+空库和已由 Flyway 管理的库使用普通 `migrate`，默认启动流程会执行。旧库结构不匹配时应排查，不能绕过校验。
 
-> **第 4 步** - 启动 FastAPI 后端 API
+数据保存在 `postgres-data` 命名卷中；不要删除卷或执行 `docker compose down -v`。数据库卷本身不是备份。
 
-```bash
-$ uvicorn main:app --reload
-```
-<br />
+## 常用命令
 
-> **第 5 步** - 在另一个终端启动唯一的 Next.js 前端
+```powershell
+# 查看日志
+docker compose logs --tail 100 gpt-researcher
+docker compose logs --tail 100 migration
 
-```bash
-$ cd frontend/nextjs
-$ npm install --legacy-peer-deps
-$ npm run dev
+# 停止服务，保留容器和数据
+docker compose stop
+
+# 运行 Java CLI 研究（使用 Compose 中的模型和数据库配置）
+docker compose run --rm gpt-researcher research "研究主题" --report_source hybrid --no-pdf
 ```
 
-直接执行 `npm run dev` 时，请将 `NEXT_PUBLIC_GPTR_API_URL=http://127.0.0.1:8000` 写入 `frontend/nextjs/.env.local`；使用 Docker Compose 时则写入项目根目录的 `.env`。
+CLI 无浏览器人工审核界面。单独执行 JAR 不自动读取根 `.env`，需要显式传入环境变量。维护命令和重建索引流程见 [Java 运维说明](backend-java/OPERATIONS.md)。
 
-在浏览器中访问 http://localhost:3000。http://localhost:8000 仅提供后端 API，根路径返回状态 JSON，Swagger 文档位于 `/docs`。
+## 开发与测试
 
-要了解如何开始使用 Docker 或了解有关功能和服务的更多信息，请访问 [documentation](https://docs.gptr.dev) 页面。
+隔离回归需要 Docker 与 PowerShell，自动创建临时 PostgreSQL，运行 Java 测试并验证备份恢复，不调用真实付费模型：
 
-## 🔍 可观测性
+```powershell
+./scripts/test_java_migration.ps1
+```
 
-GPT Researcher 支持 **LangSmith** 以增强链路追踪和可观测性，特别适用于调试和优化复杂的多智能体工作流。
+前端本地开发需要 Node.js 和 npm：
 
-要开启追踪：
-1. 设置以下环境变量：
-   ```bash
-   export LANGCHAIN_TRACING_V2=true
-   export LANGCHAIN_API_KEY=您的_API_KEY
-   export LANGCHAIN_PROJECT="gpt-researcher"
-   ```
-2. 正常运行研究任务。所有基于 LangGraph 的智能体交互将自动被追踪，并可在您的 LangSmith 控制台中查看可视化结果。
+```powershell
+cd frontend/nextjs
+npm ci --legacy-peer-deps
+npm run dev
+```
 
-## 🚀 贡献
-我们非常欢迎您的贡献！如果您感兴趣，请查看 [contributing](CONTRIBUTING.md)。
+本地开发时在 `frontend/nextjs/.env.local` 配置后端地址。前端检查：
 
-如果您有兴趣加入我们的任务，请查看我们的 [路线图](https://trello.com/b/3O7KBePw/gpt-researcher-roadmap) 页面，并通过我们的 [Discord 社区](https://discord.gg/QgZXvJAccX) 联系我们。
+```powershell
+npm run lint
+npx tsc --noEmit --incremental false
+npm run build
+```
 
-## ✉️ 支持 / 联系我们
-- [社区讨论区](https://discord.gg/spBgZmm3Xe)
-- 我们的邮箱: support@tavily.com
+真实供应商验收使用 `scripts/test_java_live.ps1`，会产生调用费用并累计记录预算，不自动重试。
 
-## 🛡 免责声明
+## 当前边界
 
-本项目 "GPT Researcher "是一个实验性应用程序，按 "现状 "提供，不做任何明示或暗示的保证。我们根据 MIT 许可分享用于学术目的的代码。本文不提供任何学术建议，也不建议在学术或研究论文中使用。
+- 当前迁移范围是实际使用的 DeepSeek、DashScope/Qwen、Tavily 及研究产品闭环，不代表全部历史供应商均已迁移。
+- 可视化支持受限流程图；不支持的供应商或 MCP 选项会明确报错。
+- 审核预算分别由 `JAVA_SECTION_REVIEW_TOKEN_LIMIT` 和 `JAVA_FACT_CHECK_TOKEN_LIMIT` 控制；未设置时优先使用显式角色预算，否则默认 16000。截断输出会中止研究，不自动扩容重试。
+- 自动化测试通过不代表真实研究全部通过。最新验证情况见 [切换验收记录](backend-java/CUTOVER_ACCEPTANCE.md)。
 
-我们对客观研究主张的看法：
-1.  我们抓取系统的全部目的是减少不正确的事实。如何解决？我们抓取的网站越多，错误数据的可能性就越小。我们每项研究都会收集20条信息，它们全部错误的可能性极低。
-2. 我们的目标不是消除偏见，而是尽可能减少偏见。**作为一个社区，我们在这里探索最有效的人机互动**。
-3. 在研究过程中，人们也容易产生偏见，因为大多数人对自己研究的课题都有自己的看法。这个工具可以搜罗到许多观点，并均匀地解释各种不同的观点，而有偏见的人是绝对读不到这些观点的。
+## 许可证与归属
 
-**请注意，使用 GPT-4 语言模型可能会因使用令牌而产生高昂费用**。使用本项目即表示您承认有责任监控和管理自己的令牌使用情况及相关费用。强烈建议您定期检查 OpenAI API 的使用情况，并设置任何必要的限制或警报，以防止发生意外费用。
-
----
-
-<p align="center">
-<a href="https://star-history.com/#assafelovic/gpt-researcher">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=assafelovic/gpt-researcher&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=assafelovic/gpt-researcher&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=assafelovic/gpt-researcher&type=Date" />
-  </picture>
-</a>
-</p>
+见 [LICENSE](LICENSE) 和 [来源记录](provenance/README.md)。

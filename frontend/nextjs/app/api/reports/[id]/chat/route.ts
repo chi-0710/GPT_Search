@@ -5,12 +5,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
-  const backendUrl = process.env.NEXT_PUBLIC_GPTR_API_URL || 'http://localhost:8000';
+  const backendUrl = process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_GPTR_API_URL ||
+    'http://localhost:8000';
   
   try {
     if (!id) {
       return NextResponse.json(
-        { error: 'Missing report ID parameter' },
+        { error: '缺少研究报告 ID 参数' },
         { status: 400 }
       );
     }
@@ -24,7 +26,7 @@ export async function GET(
   } catch (error: any) {
     console.error(`GET /api/reports/${id}/chat - Error proxying to backend:`, error);
     return NextResponse.json(
-      { error: 'Failed to connect to backend service' },
+      { error: '无法连接到后端服务' },
       { status: 500 }
     );
   }
@@ -35,12 +37,14 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
-  const backendUrl = process.env.NEXT_PUBLIC_GPTR_API_URL || 'http://localhost:8000';
+  const backendUrl = process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_GPTR_API_URL ||
+    'http://localhost:8000';
   
   try {
     if (!id) {
       return NextResponse.json(
-        { error: 'Missing report ID parameter' },
+        { error: '缺少研究报告 ID 参数' },
         { status: 400 }
       );
     }
@@ -52,7 +56,7 @@ export async function POST(
     } catch (parseError) {
       console.error('Error parsing request body:', parseError);
       return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
+        { error: '请求正文中的 JSON 格式无效' },
         { status: 400 }
       );
     }
@@ -72,8 +76,8 @@ export async function POST(
   } catch (error: any) {
     console.error(`POST /api/reports/${id}/chat - Error proxying to backend:`, error);
     return NextResponse.json(
-      { error: 'Failed to connect to backend service' },
+      { error: '无法连接到后端服务' },
       { status: 500 }
     );
   }
-} 
+}

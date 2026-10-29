@@ -69,7 +69,11 @@ public class ResearchExecutionService {
         var selection=new SourceCollector.Selection(source,scope,strings(request,"query_domains"),strings(request,"source_urls"),limit);
         String retriever=env.getProperty("RETRIEVER","tavily");
         if(!source.equals("local") && (!Set.of("tavily","mcp").contains(retriever) || (retriever.equals("mcp") && mcpConfigs.isEmpty())))throw invalid("研究检索器未接入或 MCP 配置为空");
-        var usage=new UsageLedger();var model=new SpringResearchModel(binding("FAST",6000),binding("SMART",12000),binding("STRATEGIC",8000),usage,json);
+        var usage=new UsageLedger();
+        var models=new ConfiguredChatModels(env);
+        var model=new SpringResearchModel(binding("FAST",6000),binding("SMART",12000),binding("STRATEGIC",8000),usage,json,Map.of(
+                "section_reviewer",models.reviewBinding("FAST","JAVA_SECTION_REVIEW_TOKEN_LIMIT"),
+                "fact_checker",models.reviewBinding("STRATEGIC","JAVA_FACT_CHECK_TOKEN_LIMIT")));
         Map<String,Object> options=new LinkedHashMap<>(request);options.put("resolved_document_ids",scope.stream().map(UUID::toString).toList());
         options.put("execution_backend","java");
         options.put("mcp_configs",mcpConfigs.stream().map(c->Map.of("name",c.name(),"transport",c.transport())).toList());

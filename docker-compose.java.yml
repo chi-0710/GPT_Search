@@ -1,47 +1,7 @@
-# Additive migration profile. Never replaces the working Python service or its volume.
-# docker compose -f docker-compose.yml -f docker-compose.override.yml -f docker-compose.java.yml --profile java up -d --build java-api
-services:
-  java-api:
-    profiles: [java]
-    build:
-      context: ./backend-java
-    environment:
-      JAVA_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-gpt_researcher}
-      POSTGRES_USER: ${POSTGRES_USER:-gpt_researcher}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gpt_researcher}
-      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:${FRONTEND_PORT:-3002},http://127.0.0.1:${FRONTEND_PORT:-3002}}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
-    ports:
-      - "127.0.0.1:${JAVA_BACKEND_PORT:-8001}:8000"
-    depends_on:
-      migration:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
-  postgres-java-test:
-    profiles: [java-test]
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_DB: researchrunner_java_test
-      POSTGRES_USER: java_test
-      POSTGRES_PASSWORD: java_test
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U java_test -d researchrunner_java_test"]
-      interval: 3s
-      timeout: 5s
-      retries: 20
-    # No production volume or published database port.
-    tmpfs:
-      - /var/lib/postgresql/data
-
-  java-tests:
-    profiles: [java-test]
-    build:
-      context: ./backend-java
-      target: build
-    environment:
-      JAVA_TEST_DATABASE_URL: jdbc:postgresql://postgres-java-test:5432/researchrunner_java_test
-    depends_on:
-      postgres-java-test:
-        condition: service_healthy
-    command: ["mvn", "-B", "-ntp", "-s", "maven-settings.xml", "test"]
+# Deprecated compatibility overlay.
+#
+# The Java backend is now the only backend and is defined by the root
+# docker-compose.yml under the compatibility service name `gpt-researcher`.
+# Keep this file as a harmless no-op for old local commands that still pass
+# `-f docker-compose.java.yml`; do not reintroduce a second backend writer.
+services: {}

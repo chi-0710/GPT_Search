@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import FileUpload from "../Settings/FileUpload";
 import ToneSelector from "../Settings/ToneSelector";
 import MCPSelector from "../Settings/MCPSelector";
 import LayoutSelector from "../Settings/LayoutSelector";
@@ -28,18 +27,13 @@ export default function ResearchForm({
   const [newDomain, setNewDomain] = useState('');
 
   // Destructure necessary fields from chatBoxSettings
-  let { report_type, report_source, tone, layoutType } = chatBoxSettings;
+  const { report_source, tone, layoutType } = chatBoxSettings;
 
-  const [domains, setDomains] = useState<Domain[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('domainFilters');
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
+  const [domains, setDomains] = useState<Domain[]>(() =>
+    (chatBoxSettings.domains || []).map(value => ({ value })),
+  );
   
   useEffect(() => {
-    localStorage.setItem('domainFilters', JSON.stringify(domains));
     setChatBoxSettings(prev => ({
       ...prev,
       domains: domains.map(domain => domain.value)
@@ -95,10 +89,11 @@ export default function ResearchForm({
     if (onFormSubmit) {
       const updatedSettings = {
         ...chatBoxSettings,
+        report_type: "multi_agents",
         domains: domains.map(domain => domain.value)
       };
       setChatBoxSettings(updatedSettings);
-      onFormSubmit(task, report_type, report_source, domains);
+      onFormSubmit(task, "multi_agents", report_source, domains);
     }
   };
 
@@ -108,31 +103,11 @@ export default function ResearchForm({
       className="report_settings_static mt-3"
       onSubmit={handleSubmit}
     >
-      <div className="form-group">
-        <label htmlFor="report_type" className="agent_question">
-          Report Type{" "}
-        </label>
-        <select
-          name="report_type"
-          value={report_type}
-          onChange={onFormChange}
-          className="form-control-static"
-          required
-        >
-          <option value="research_report">
-            Summary - Short and fast (~2 min)
-          </option>
-          <option value="deep">Deep Research Report</option>
-          <option value="multi_agents">Multi Agents Report</option>
-          <option value="detailed_report">
-            Detailed - In depth and longer (~5 min)
-          </option>
-        </select>
-      </div>
+      <p className="agent_question">多智能体研究</p>
 
       <div className="form-group">
         <label htmlFor="report_source" className="agent_question">
-          Report Source{" "}
+          报告来源{" "}
         </label>
         <select
           name="report_source"
@@ -141,18 +116,14 @@ export default function ResearchForm({
           className="form-control-static"
           required
         >
-          <option value="web">The Internet</option>
-          <option value="local">My Documents</option>
-          <option value="hybrid">Hybrid</option>
+          <option value="web">仅网络</option>
+          <option value="local">仅文件</option>
+          <option value="hybrid">文件＋网络</option>
         </select>
       </div>
 
       
 
-      {report_source === "local" || report_source === "hybrid" ? (
-        <FileUpload />
-      ) : null}
-      
       <ToneSelector tone={tone} onToneChange={onToneChange} />
 
       <MCPSelector 

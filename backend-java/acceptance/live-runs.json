@@ -9,5 +9,15 @@
     "error_type": "HttpResponseException",
     "finished_at": "2026-10-28T06:42:55.5960719Z",
     "diagnosis": "Tavily TLS handshake terminated before initial evidence; no report published. Unauthenticated connectivity probes also failed for DashScope and proxied Tavily. No paid retry."
+  },
+  {
+    "number": 2,
+    "source": "web",
+    "started_at": "2026-10-29T02:26:33.9351668Z",
+    "status": "failed",
+    "max_sections": 2,
+    "paid_images": false,
+    "error_type": "HttpResponseException",
+    "finished_at": "2026-10-29T02:28:56.8003074Z"
   }
 ]

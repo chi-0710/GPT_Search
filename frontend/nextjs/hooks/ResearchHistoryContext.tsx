@@ -15,6 +15,7 @@ interface ResearchHistoryContextType {
   addChatMessage: (id: string, message: ChatMessage) => Promise<boolean>;
   getChatMessages: (id: string) => ChatMessage[];
   clearHistory: () => Promise<boolean>;
+  refreshHistory: () => Promise<void>;
 }
 
 // Create the context with a default undefined value
@@ -41,4 +42,4 @@ export const useResearchHistoryContext = () => {
   }
   
   return context;
-}; 
+};

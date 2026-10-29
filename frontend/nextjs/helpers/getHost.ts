@@ -5,14 +5,10 @@ interface GetHostParams {
 export const getHost = ({ purpose }: GetHostParams = {}): string => {
   if (typeof window !== 'undefined') {
     let { host } = window.location;
-    const apiUrlInLocalStorage = localStorage.getItem("GPTR_API_URL");
-    
     const urlParams = new URLSearchParams(window.location.search);
     const apiUrlInUrlParams = urlParams.get("GPTR_API_URL");
     
-    if (apiUrlInLocalStorage) {
-      return apiUrlInLocalStorage;
-    } else if (apiUrlInUrlParams) {
+    if (apiUrlInUrlParams) {
       return apiUrlInUrlParams;
     } else if (process.env.NEXT_PUBLIC_GPTR_API_URL) {
       return process.env.NEXT_PUBLIC_GPTR_API_URL;

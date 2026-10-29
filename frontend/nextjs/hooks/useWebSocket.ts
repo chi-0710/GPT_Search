@@ -1,5 +1,6 @@
+import { normalizeResearchSettings } from '../utils/researchSettings';
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Data, ChatBoxSettings, QuestionData } from '../types/data';
+import { Data, ChatBoxSettings } from '../types/data';
 import { getHost } from '../helpers/getHost';
 
 export const useWebSocket = (
@@ -7,53 +8,54 @@ export const useWebSocket = (
   setAnswer: React.Dispatch<React.SetStateAction<string>>, 
   setLoading: React.Dispatch<React.SetStateAction<boolean>>,
   setShowHumanFeedback: React.Dispatch<React.SetStateAction<boolean>>,
-  setQuestionForHuman: React.Dispatch<React.SetStateAction<boolean | true>>
+  setQuestionForHuman: React.Dispatch<React.SetStateAction<boolean | true>>,
+  onResearchStarted?: (researchId: string, runId?: string) => void,
 ) => {
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const reviewRef = useRef<{run_id: string; round: number; request_id: string} | null>(null);
   const heartbeatInterval = useRef<number>();
 
-  // Cleanup function for heartbeat and socket on unmount
-  useEffect(() => {
-    return () => {
-      // Clear heartbeat interval
-      if (heartbeatInterval.current) {
-        clearInterval(heartbeatInterval.current);
-      }
-      
-      // Close socket on unmount if it exists and is open
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        console.log('Closing WebSocket due to component unmount');
-        socket.close(1000, "Component unmounted");
-      }
-    };
-  }, [socket]);
-
-  const startHeartbeat = (ws: WebSocket) => {
-    // Clear any existing heartbeat
-    if (heartbeatInterval.current) {
-      clearInterval(heartbeatInterval.current);
+  const clearHeartbeat = useCallback(() => {
+    if (heartbeatInterval.current !== undefined) {
+      window.clearInterval(heartbeatInterval.current);
+      heartbeatInterval.current = undefined;
     }
-    
-    // Start new heartbeat
+  }, []);
+
+  const releaseConnection = useCallback(() => {
+    const current = socketRef.current;
+    // Invalidate callbacks before closing, including a connection still opening.
+    socketRef.current = null;
+    reviewRef.current = null;
+    clearHeartbeat();
+    if (current && (current.readyState === WebSocket.CONNECTING ||
+                    current.readyState === WebSocket.OPEN)) {
+      current.close(1000, "Research connection closed");
+    }
+  }, [clearHeartbeat]);
+
+  const closeConnection = useCallback(() => {
+    releaseConnection();
+    setSocket(null);
+  }, [releaseConnection]);
+
+  useEffect(() => releaseConnection, [releaseConnection]);
+
+  const startHeartbeat = useCallback((ws: WebSocket) => {
+    clearHeartbeat();
     heartbeatInterval.current = window.setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (socketRef.current === ws && ws.readyState === WebSocket.OPEN) {
         ws.send('ping');
       }
-    }, 30000); // Send ping every 30 seconds
-  };
+    }, 30000);
+  }, [clearHeartbeat]);
 
   const initializeWebSocket = useCallback((
     promptValue: string, 
     chatBoxSettings: ChatBoxSettings
   ) => {
-    // Close existing socket if any
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      console.log('Closing existing WebSocket connection');
-      socket.close(1000, "New connection requested");
-    }
-
-    const storedConfig = localStorage.getItem('apiVariables');
-    const apiVariables = storedConfig ? JSON.parse(storedConfig) : {};
+    closeConnection();
 
     if (typeof window !== 'undefined') {
       
@@ -64,15 +66,16 @@ export const useWebSocket = (
 
       console.log(`Creating new WebSocket connection to ${ws_uri}`);
       const newSocket = new WebSocket(ws_uri);
+      socketRef.current = newSocket;
       setSocket(newSocket);
 
       // WebSocket connection opened handler
       newSocket.onopen = () => {
+        if (socketRef.current !== newSocket) return;
         console.log('WebSocket connection opened');
         
-        const domainFilters = JSON.parse(localStorage.getItem('domainFilters') || '[]');
-        const domains = domainFilters ? domainFilters.map((domain: any) => domain.value) : [];
-        const { report_type, report_source, tone, mcp_enabled, mcp_configs, mcp_strategy } = chatBoxSettings;
+        const domains = chatBoxSettings.domains || [];
+        const { report_type, report_source, tone, mcp_enabled, mcp_configs, mcp_strategy } = normalizeResearchSettings(chatBoxSettings);
         
         // Start a new research
         try {
@@ -80,7 +83,9 @@ export const useWebSocket = (
           const dataToSend = { 
             task: promptValue,
             report_type, 
-            report_source, 
+            report_source,
+            document_scope: chatBoxSettings.document_scope || "all",
+            document_ids: chatBoxSettings.document_ids || [],
             tone,
             query_domains: domains,
             mcp_enabled: mcp_enabled || false,
@@ -94,12 +99,16 @@ export const useWebSocket = (
           newSocket.send(message);
         } catch (error) {
           console.error("Error preparing start message:", error);
+          closeConnection();
+          setLoading(false);
+          return;
         }
         
         startHeartbeat(newSocket);
       };
 
       newSocket.onmessage = (event) => {
+        if (socketRef.current !== newSocket) return;
         try {
           // Handle ping response
           if (event.data === 'pong') return;
@@ -108,9 +117,16 @@ export const useWebSocket = (
           console.log(`Received WebSocket message: ${event.data.substring(0, 100)}...`);
           const data = JSON.parse(event.data);
           
-          if (data.type === 'error') {
-            console.error(`Server error: ${data.output}`);
+          if (data.type === 'error' || (data.type === 'logs' && data.content === 'error')) {
+            setLoading(false);
+            setOrderedData(prev => [...prev, {type: 'chat', content: data.output || '研究失败'}]);
+          } else if (data.type === 'research_started') {
+            onResearchStarted?.(data.research_id, data.run_id);
+            const contentAndType = `${data.content}-${data.type}`;
+            setOrderedData((prevOrder) => [...prevOrder, { ...data, contentAndType }]);
           } else if (data.type === 'human_feedback' && data.content === 'request') {
+            reviewRef.current = data.run_id && data.request_id
+              ? {run_id: data.run_id, round: data.round, request_id: data.request_id} : null;
             setQuestionForHuman(data.output);
             setShowHumanFeedback(true);
           } else {
@@ -132,22 +148,28 @@ export const useWebSocket = (
         }
       };
 
-      newSocket.onclose = (event) => {
-        console.log(`WebSocket connection closed: code=${event.code}, reason=${event.reason}`);
-        if (heartbeatInterval.current) {
-          clearInterval(heartbeatInterval.current);
-        }
-        setSocket(null);
+      newSocket.onclose = () => {
+        if (socketRef.current !== newSocket) return;
+        closeConnection();
+        setLoading(false);
       };
 
       newSocket.onerror = (error) => {
+        if (socketRef.current !== newSocket) return;
         console.error('WebSocket error:', error);
-        if (heartbeatInterval.current) {
-          clearInterval(heartbeatInterval.current);
-        }
+        closeConnection();
+        setLoading(false);
       };
     }
-  }, [socket, setOrderedData, setAnswer, setLoading, setShowHumanFeedback, setQuestionForHuman]);
+  }, [closeConnection, startHeartbeat, setOrderedData, setAnswer, setLoading, setShowHumanFeedback, setQuestionForHuman, onResearchStarted]);
 
-  return { socket, setSocket, initializeWebSocket };
+  const sendHumanFeedback = useCallback((feedback: string | null) => {
+    const current = socketRef.current;
+    if (current?.readyState !== WebSocket.OPEN) return false;
+    current.send(JSON.stringify({type: 'human_feedback', content: feedback ?? 'no', ...reviewRef.current}));
+    reviewRef.current = null;
+    return true;
+  }, []);
+
+  return { socket, setSocket, initializeWebSocket, closeConnection, sendHumanFeedback };
 };

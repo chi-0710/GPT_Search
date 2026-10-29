@@ -1,4 +1,6 @@
-# GPT Researcher x Deep Agents: 2x the verified evidence, same harness
+> 历史归档：本目录仅保留实验数据、结果和来源说明；文中运行命令对应的执行代码已移除，不能继续使用。当前应用仅使用 LangGraph 多智能体工作流。
+
+# ResearchRunner x Deep Agents: 2x the verified evidence, same harness
 
 *A shareable summary of the new Deep Agents example and its benchmark results.
 Full details: [example](https://github.com/assafelovic/gpt-researcher/tree/master/deep_agents),
@@ -6,12 +8,12 @@ Full details: [example](https://github.com/assafelovic/gpt-researcher/tree/maste
 
 ## What we built
 
-We plugged GPT Researcher into LangChain's
+We plugged ResearchRunner into LangChain's
 [Deep Agents](https://docs.langchain.com/oss/python/deepagents/overview) as
 the research engine: a chief-editor deep agent plans a report outline with
 `write_todos`, spawns parallel `researcher` subagents, and each subagent
-calls GPT Researcher's full pipeline (`deep_research`) to produce a cited
-section draft. The harness handles orchestration; GPT Researcher handles
+calls ResearchRunner's full pipeline (`deep_research`) to produce a cited
+section draft. The harness handles orchestration; ResearchRunner handles
 evidence. It reproduces the STORM-style pipeline of our 8-agent LangGraph
 example in a fraction of the code, and works over the web, local documents
 (PDF/DOCX/md), or both.
@@ -19,14 +21,14 @@ example in a fraction of the code, and works over the web, local documents
 ## What we measured
 
 The obvious question: does swapping the quickstart's raw search tool for
-GPT Researcher actually make the agent's research better? We ran both on
+ResearchRunner actually make the agent's research better? We ran both on
 [DeepResearch Bench](https://github.com/Ayanami0730/deep_research_bench)
 (RACE report quality + FACT citation verification, 10 topic-stratified
 tasks), keeping everything else identical - same `create_deep_agent`
 harness, same `gpt-5.4` model, same system prompt, same step budget. The
 only variable was the research tooling.
 
-| Metric | Deep agent + raw Tavily search | Deep agent + GPT Researcher |
+| Metric | Deep agent + raw Tavily search | Deep agent + ResearchRunner |
 |---|---|---|
 | RACE report quality | 0.503 | **0.512** |
 | Citations per report | 34.5 | **62.9** |
@@ -48,10 +50,10 @@ Bench reports for dedicated deep research products (OpenAI Deep Research
   two setups score at parity (83.3% vs 83.3%) - the heavier pipeline costs
   nothing on simple lookups.
 - **Blind judge preference**: in a pairwise report comparison on 8 topics
-  (sides randomized), an LLM judge preferred the GPT Researcher agent's
+  (sides randomized), an LLM judge preferred the ResearchRunner agent's
   report **5 of 8 times**, with more distinct sources cited (24.5 vs 19.5
   unique URLs) at comparable length.
-- **Breadth beyond the web**: with GPT Researcher's `hybrid` mode, the same
+- **Breadth beyond the web**: with ResearchRunner's `hybrid` mode, the same
   agent researches private documents alongside the web. On a due-diligence
   task over a realistic fictional internal corpus (27 files: PDFs, DOCX,
   distractors, stale archived vintages - no leakage from the public web
@@ -59,14 +61,14 @@ Bench reports for dedicated deep research products (OpenAI Deep Research
   for the raw-search agent. Even the DIY alternative - mounting the corpus
   on the deep agent's own file tools - averages only 62.5%: it has to
   guess which files to read, cannot parse DOCX, and sometimes trusts an
-  archived vintage. GPT Researcher's format-aware parsing and embedding
+  archived vintage. ResearchRunner's format-aware parsing and embedding
   retrieval make it both higher and consistent, at equal public-web fact
   coverage.
 
 ## Why it works
 
 A raw search tool returns snippets, so the writing model cites whatever the
-search API surfaced and fills gaps from memory. GPT Researcher plans
+search API surfaced and fills gaps from memory. ResearchRunner plans
 sub-queries, scrapes and reads the full pages, filters content by relevance,
 and hands the agent pre-cited synthesis - so what reaches the final report
 is grounded in sources that were actually read.

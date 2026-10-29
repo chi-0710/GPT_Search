@@ -1,7 +1,7 @@
-declare module 'gpt-researcher-ui' {
+declare module 'researchrunner-ui' {
   import React from 'react';
 
-  export interface GPTResearcherProps {
+  export interface ResearchProps {
     apiUrl?: string;
     apiKey?: string;
     defaultPrompt?: string;
@@ -9,5 +9,5 @@ declare module 'gpt-researcher-ui' {
     theme?: any;
   }
 
-  export const GPTResearcher: React.FC<GPTResearcherProps>;
+  export const Research: React.FC<ResearchProps>;
 }

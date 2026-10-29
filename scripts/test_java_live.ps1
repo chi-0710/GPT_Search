@@ -24,7 +24,7 @@ function Set-TaskEnvironment([string]$key,[string]$value) {
 $attempt = $null
 try {
     # Read only required provider settings. Values are passed through process environment, never command text/logs.
-    $allowed = @('FAST_LLM','SMART_LLM','STRATEGIC_LLM','FAST_TOKEN_LIMIT','SMART_TOKEN_LIMIT','STRATEGIC_TOKEN_LIMIT','LLM_KWARGS','DEEPSEEK_API_KEY','DASHSCOPE_API_KEY','DASHSCOPE_BASE_URL','EMBEDDING','EMBEDDING_DIMENSION','EMBEDDING_KWARGS','TAVILY_API_KEY','RETRIEVER','TEMPERATURE')
+    $allowed = @('FAST_LLM','SMART_LLM','STRATEGIC_LLM','FAST_TOKEN_LIMIT','SMART_TOKEN_LIMIT','STRATEGIC_TOKEN_LIMIT','JAVA_SECTION_REVIEW_TOKEN_LIMIT','JAVA_FACT_CHECK_TOKEN_LIMIT','LLM_KWARGS','DEEPSEEK_API_KEY','DASHSCOPE_API_KEY','DASHSCOPE_BASE_URL','EMBEDDING','EMBEDDING_DIMENSION','EMBEDDING_KWARGS','TAVILY_API_KEY','RETRIEVER','TEMPERATURE')
     foreach ($line in Get-Content -LiteralPath (Join-Path $taskRoot '.env')) {
         if ($line -match '^\s*([A-Z_0-9]+)\s*=\s*(.*?)\s*$' -and $allowed -contains $Matches[1]) {
             $key=$Matches[1];$value=$Matches[2]

@@ -1,6 +1,6 @@
 # ResearchRunner Java 运维与验收
 
-当前默认入口仍为 Python。以下 Java 写入命令仅用于隔离验收，或在停止旧业务写入者并完成切换前置验收后使用。不得让 Java 和 Python 同时写入同一个应用库。
+当前默认入口为 Java。维护或迁移前停止业务写入，保留备份，避免多个进程同时修改业务数据库。
 
 ## 数据库迁移
 
@@ -47,7 +47,7 @@ stdio 必须由运维配置 `JAVA_MCP_ALLOWED_COMMANDS` 精确允许程序；不
 ```powershell
 # 无 Python 的隔离 Java 建库、完整测试、备份恢复验证
 ./scripts/test_java_migration.ps1 -JavaOnly
-# 旧 Alembic 库结构对照（保留历史验证用途）
+# Java 隔离回归（默认使用 Java 建库）
 ./scripts/test_java_migration.ps1
 # 实际供应商调用：先检查预算和网络，不自动重试
 ./scripts/test_java_live.ps1 -Source web
@@ -59,10 +59,34 @@ stdio 必须由运维配置 `JAVA_MCP_ALLOWED_COMMANDS` 精确允许程序；不
 
 2026-10-28 第一次 web 实测在 Tavily TLS 握手失败，未发布报告；随后无凭据检查也发现 DashScope TLS 失败。DeepSeek 地址可达仅说明网络连通，不是模型、工具调用或研究通过。余下实测暂不运行，直到网络恢复。
 
-## 默认部署切换门槛与回滚
+## 默认部署与恢复
 
-尚未完成全部供应商、完整浏览器流程、真实三来源研究及生产库恢复演练，因此本批不修改默认 Compose 或删除 Python。
+使用根目录 Compose 构建 Java 服务。恢复前备份当前数据库，避免覆盖新增数据；保留现有服务名和数据卷。实际验证结果见 CUTOVER_ACCEPTANCE.md，历史迁移记录不代表当前部署状态。
 
-切换前须完成：完整供应商协议矩阵；真实三来源研究、聊天及导出；真实应用库备份及隔离恢复对照；Python 回滚演练；Java CLI 与维护命令；前端人工反馈和下载；无 Python 默认环境验证。测试库恢复成功不能替代真实应用库恢复演练。
+### Maven 镜像构建
 
-通过后停止 Python 接收新任务并等待结束，备份后停掉 Python 写入服务，再执行显式 Java 基线/迁移并启动 Java。保留原服务名、端口、网络、数据库及卷。核对历史与新业务后才保留 Java 默认入口。失败时先停止 Java 写入，保存切换后的新增数据，再从保留镜像或 Git 历史恢复旧服务；不得用旧备份直接覆盖新增数据，不删除 PostgreSQL 卷。
+默认多阶段 `Dockerfile` 通过 `MAVEN_MIRROR_URL` 选择 Central 镜像，根 Compose 默认使用 `https://maven.aliyun.com/repository/public`。BuildKit 缓存 Maven 本地仓库，`mvn verify` 设置 20 分钟硬超时并运行完整测试。构建不再单独执行 `dependency:go-offline`，因为该目标会解析实际构建不需要的额外元数据，在部分网络环境中可能长时间停滞。
+
+```powershell
+docker compose build gpt-researcher migration
+```
+
+在能稳定访问 Maven Central 的环境中可以显式覆盖：
+
+```powershell
+$env:MAVEN_MIRROR_URL = "https://repo.maven.apache.org/maven2"
+docker compose build gpt-researcher migration
+```
+
+网络不可用但已有经过 `mvn verify` 验证的 JAR 时，可使用独立的 runtime-only Dockerfile。脚本仅组装现有 JAR，不编译、不测试，也不修改默认 Compose；构建结束后会删除临时暂存副本。
+
+```powershell
+./scripts/build_java_runtime_image.ps1 `
+    -JarPath ./backend-java/target/researchrunner-api-0.1.0-SNAPSHOT.jar
+```
+
+不要将 `target-image/app.jar` 提交到仓库。正常发布仍以默认多阶段 `Dockerfile` 为准。
+
+### 审核输出预算
+
+章节审核和事实核查分别使用 `JAVA_SECTION_REVIEW_TOKEN_LIMIT`、`JAVA_FACT_CHECK_TOKEN_LIMIT`。优先级为阶段专用值、显式 FAST/STRATEGIC_TOKEN_LIMIT、默认 16000。保留原模型选择，规划与写作预算不变；不自动扩容或重试。预算必须为正数，供应商的模型上限仍然适用。发生截断时继续失败，并记录阶段与模型；增加预算不代表真实研究已验收。

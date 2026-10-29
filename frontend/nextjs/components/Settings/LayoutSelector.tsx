@@ -8,7 +8,7 @@ interface LayoutSelectorProps {
 export default function LayoutSelector({ layoutType, onLayoutChange }: LayoutSelectorProps) {
   return (
     <div className="form-group">
-      <label htmlFor="layoutType" className="agent_question">Layout Type </label>
+      <label htmlFor="layoutType" className="agent_question">界面布局 </label>
       <select 
         name="layoutType" 
         id="layoutType" 
@@ -17,9 +17,9 @@ export default function LayoutSelector({ layoutType, onLayoutChange }: LayoutSel
         className="form-control-static"
         required
       >
-        <option value="research">Research - Traditional research layout with detailed results</option>
-        <option value="copilot">Copilot - Side-by-side research and chat interface</option>
+        <option value="research">研究模式－传统布局，集中展示详细结果</option>
+        <option value="copilot">助手模式－并排展示研究结果和聊天界面</option>
       </select>
     </div>
   );
-} 
+}

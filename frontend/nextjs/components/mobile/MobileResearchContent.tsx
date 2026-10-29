@@ -93,15 +93,6 @@ export default function MobileResearchContent({
     }
     
     try {
-      // Get chat settings from localStorage or use defaults
-      const reportSource = window.localStorage.getItem('chatBoxSettings') ? 
-        JSON.parse(window.localStorage.getItem('chatBoxSettings') || '{}').report_source || 'web' :
-        'web';
-        
-      const tone = window.localStorage.getItem('chatBoxSettings') ?
-        JSON.parse(window.localStorage.getItem('chatBoxSettings') || '{}').tone || 'Objective' :
-        'Objective';
-      
       // Get all existing chat messages for context if we have a research ID
       const existingMessages = currentResearchId ? 
         getChatMessages(currentResearchId) : [];
@@ -121,8 +112,6 @@ export default function MobileResearchContent({
         body: JSON.stringify({
           messages: formattedMessages,
           report: localAnswer || '',
-          report_source: reportSource,
-          tone: tone
         }),
       });
       
@@ -168,11 +157,11 @@ export default function MobileResearchContent({
         // Show error for invalid or empty response
         const errorData: ChatData = {
           type: 'chat',
-          content: 'Sorry, I couldn\'t generate a proper response. Please try again.'
+          content: '抱歉，未能生成合适的回答，请重试。'
         };
         
         setLocalOrderedData(prev => [...prev, errorData]);
-        toast.error("Received an invalid response from the server", {
+        toast.error("服务器返回了无效响应", {
           duration: 3000,
           position: "bottom-center"
         });
@@ -183,11 +172,11 @@ export default function MobileResearchContent({
       
       const errorData: ChatData = {
         type: 'chat',
-        content: 'Sorry, there was an error processing your request. Please try again.'
+        content: '抱歉，处理你的请求时发生错误，请重试。'
       };
       
       setLocalOrderedData(prev => [...prev, errorData]);
-      toast.error("Failed to communicate with the server", {
+      toast.error("与服务器通信失败", {
         duration: 3000,
         position: "bottom-center"
       });
@@ -219,14 +208,14 @@ export default function MobileResearchContent({
               <>
                 <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse mr-2"></div>
                 <span className="text-xs text-gray-300">
-                  {localLoading ? "Researching..." : "Processing..."}
+                  {localLoading ? "研究中……" : "处理中……"}
                 </span>
               </>
             )}
             {!localLoading && !localProcessing && currentResearchId && (
               <>
                 <div className="w-2 h-2 rounded-full bg-teal-500 mr-2"></div>
-                <span className="text-xs text-gray-300">Research complete</span>
+                <span className="text-xs text-gray-300">研究完成</span>
               </>
             )}
           </div>
@@ -242,7 +231,7 @@ export default function MobileResearchContent({
                 <polyline points="16 6 12 2 8 6"></polyline>
                 <line x1="12" y1="2" x2="12" y2="15"></line>
               </svg>
-              Share
+              分享
             </button>
           )}
         </div>
@@ -305,4 +294,4 @@ export default function MobileResearchContent({
       `}</style>
     </div>
   );
-} 
+}

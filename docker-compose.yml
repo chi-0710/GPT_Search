@@ -1,11 +1,73 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gpt_researcher}
+      POSTGRES_USER: ${POSTGRES_USER:-gpt_researcher}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gpt_researcher}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  migration:
+    image: gptresearcher/gpt-researcher
+    build:
+      context: ./backend-java
+      dockerfile: Dockerfile
+      args:
+        MAVEN_MIRROR_URL: ${MAVEN_MIRROR_URL:-https://maven.aliyun.com/repository/public}
+    # Existing legacy databases are baselined only by an explicit one-off command.
+    # Normal startup must never opt into baselining automatically.
+    command: ["migrate"]
+    environment:
+      JAVA_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-gpt_researcher}
+      POSTGRES_USER: ${POSTGRES_USER:-gpt_researcher}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gpt_researcher}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   gpt-researcher:
     pull_policy: build
     image: gptresearcher/gpt-researcher
-    build: ./
+    build:
+      context: ./backend-java
+      dockerfile: Dockerfile
+      args:
+        MAVEN_MIRROR_URL: ${MAVEN_MIRROR_URL:-https://maven.aliyun.com/repository/public}
     environment: 
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
-      SHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      JAVA_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-gpt_researcher}
+      POSTGRES_USER: ${POSTGRES_USER:-gpt_researcher}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gpt_researcher}
+      JAVA_WRITES_ENABLED: 'true'
+      JAVA_DB_READ_ONLY: 'false'
+      JAVA_REQUIRE_FLYWAY: 'true'
+      JAVA_EXPECTED_MIGRATION: ${JAVA_EXPECTED_MIGRATION:-1}
+      JAVA_SECTION_REVIEW_TOKEN_LIMIT: ${JAVA_SECTION_REVIEW_TOKEN_LIMIT:-${FAST_TOKEN_LIMIT:-16000}}
+      JAVA_FACT_CHECK_TOKEN_LIMIT: ${JAVA_FACT_CHECK_TOKEN_LIMIT:-${STRATEGIC_TOKEN_LIMIT:-16000}}
+      JAVA_SECTION_CONCURRENCY: ${JAVA_SECTION_CONCURRENCY:-3}
+      JAVA_VISUALIZATION_ENABLED: ${JAVA_VISUALIZATION_ENABLED:-true}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-30}
+      MAX_BLOB_SIZE_MB: ${MAX_BLOB_SIZE_MB:-50}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
+      DOCUMENT_CHUNK_SIZE: ${DOCUMENT_CHUNK_SIZE:-1000}
+      DOCUMENT_CHUNK_OVERLAP: ${DOCUMENT_CHUNK_OVERLAP:-100}
+      DOCUMENT_RETRIEVAL_LIMIT: ${DOCUMENT_RETRIEVAL_LIMIT:-8}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:${FRONTEND_PORT:-3002},http://127.0.0.1:${FRONTEND_PORT:-3002}}
+      DOCUMENT_CONTEXT_CHAR_BUDGET: ${DOCUMENT_CONTEXT_CHAR_BUDGET:-12000}
+      WEB_CONTEXT_CHAR_BUDGET: ${WEB_CONTEXT_CHAR_BUDGET:-12000}
+      DOCUMENT_SIMILARITY_THRESHOLD: ${DOCUMENT_SIMILARITY_THRESHOLD:-0.35}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
@@ -15,17 +77,16 @@ services:
       EMBEDDING: ${EMBEDDING:-openai:text-embedding-3-small}
       TAVILY_API_KEY: ${TAVILY_API_KEY}
       LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
-      LOGGING_LEVEL: INFO
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
       # Image generation (optional - set to enable inline images in reports)
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       IMAGE_GENERATION_ENABLED: ${IMAGE_GENERATION_ENABLED:-false}
       IMAGE_GENERATION_MODEL: ${IMAGE_GENERATION_MODEL:-gemini-2.0-flash-preview-image-generation}
       IMAGE_GENERATION_MAX_IMAGES: ${IMAGE_GENERATION_MAX_IMAGES:-3}
-    volumes:
-      - ${PWD}/my-docs:/usr/src/app/my-docs:rw
-      - ${PWD}/outputs:/usr/src/app/outputs:rw
-      - ${PWD}/logs:/usr/src/app/logs:rw
-    user: root
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+
     restart: always
     ports:
       - 8000:8000
@@ -39,6 +100,7 @@ services:
       LOGGING_LEVEL: INFO
       NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
       NEXT_PUBLIC_GPTR_API_URL: ${NEXT_PUBLIC_GPTR_API_URL}
+      INTERNAL_API_URL: http://gpt-researcher:8000
     build:
       dockerfile: Dockerfile.dev
       context: frontend/nextjs
@@ -46,39 +108,9 @@ services:
       - /app/node_modules
       - ./frontend/nextjs:/app
       - ./frontend/nextjs/.next:/app/.next
-      - ./outputs:/app/outputs
     restart: always
     ports:
-      - 3002:3000
+      - "${FRONTEND_PORT:-3002}:3000"
 
-  gpt-researcher-tests:
-    image: gptresearcher/gpt-researcher-tests
-    build: ./
-    environment: 
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
-      TAVILY_API_KEY: ${TAVILY_API_KEY}
-      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
-      LOGGING_LEVEL: INFO
-    profiles: ["test"]
-    command: >
-      /bin/sh -c "
-      pip install pytest pytest-asyncio faiss-cpu &&
-      python -m pytest tests/report-types.py &&
-      python -m pytest tests/vector-store.py
-      "
-  
-  discord-bot:
-    build:
-      context: ./docs/discord-bot
-      dockerfile: Dockerfile.dev
-    environment:
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
-    volumes:
-      - ./docs/discord-bot:/app
-      - /app/node_modules
-    ports:
-      - 3001:3000
-    profiles: ["discord"]
-    restart: always
+volumes:
+  postgres-data:
